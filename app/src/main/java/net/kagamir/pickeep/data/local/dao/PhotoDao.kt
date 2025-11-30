@@ -55,6 +55,9 @@ interface PhotoDao {
     @Query("UPDATE photos SET sync_status = :status WHERE id = :photoId")
     suspend fun updateStatus(photoId: Long, status: SyncStatus)
     
+    @Query("UPDATE photos SET sync_status = :newStatus WHERE sync_status = :oldStatus")
+    suspend fun updateStatusByStatus(oldStatus: SyncStatus, newStatus: SyncStatus)
+    
     @Query("UPDATE photos SET sync_status = :status, error_message = :errorMessage, retry_count = retry_count + 1, last_attempt_at = :timestamp WHERE id = :photoId")
     suspend fun updateStatusWithError(photoId: Long, status: SyncStatus, errorMessage: String, timestamp: Long)
     

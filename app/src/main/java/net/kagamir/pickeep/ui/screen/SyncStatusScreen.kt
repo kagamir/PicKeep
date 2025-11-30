@@ -43,8 +43,16 @@ fun SyncStatusScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
     val snackbarHostState = remember { SnackbarHostState() }
     
-    // 监听同步状态
+    // 进入首页时清理未完成的同步任务
     LaunchedEffect(Unit) {
+        scope.launch {
+            // 将状态为 UPLOADING 的任务重置为 PENDING，以便下次重新上传
+            database.photoDao().updateStatusByStatus(SyncStatus.UPLOADING, SyncStatus.PENDING)
+            
+            // 重置同步状态
+            syncState.stopSync()
+        }
+        
         launch {
             database.photoDao().countByStatus(SyncStatus.PENDING).collect {
                 pendingCount = it

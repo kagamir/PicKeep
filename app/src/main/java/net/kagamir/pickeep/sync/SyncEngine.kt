@@ -11,6 +11,7 @@ import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.data.local.entity.SyncStatus
 import net.kagamir.pickeep.monitor.PhotoScanner
 import net.kagamir.pickeep.storage.StorageClient
+import net.kagamir.pickeep.storage.webdav.ChunkedUploader
 import java.io.File
 import java.util.UUID
 
@@ -29,6 +30,68 @@ class SyncEngine(
     private val photoDao = database.photoDao()
     private val deviceId: String = getOrCreateDeviceId()
     private val photoScanner = PhotoScanner(context, database)
+    
+    /**
+     * 计算最优并发数
+     * 根据文件大小和可用内存动态计算，最大不超过3
+     * 
+     * @param photos 待上传的照片列表
+     * @return 最优并发数（1-3）
+     */
+    private fun calculateOptimalConcurrency(
+        photos: List<net.kagamir.pickeep.data.local.entity.PhotoEntity>
+    ): Int {
+        val runtime = Runtime.getRuntime()
+        val maxMemory = runtime.maxMemory()
+        val totalMemory = runtime.totalMemory()
+        val freeMemory = runtime.freeMemory()
+        val availableMemory = maxMemory - totalMemory + freeMemory
+        
+        // 保留30%内存给系统和其他应用
+        val usableMemory = (availableMemory * 0.7).toLong()
+        
+        // 估算每个上传任务的内存占用
+        // 基础开销：源文件读取缓冲区(8KB) + 其他开销(2MB)
+        val baseMemoryPerTask = 2 * 1024 * 1024 + 8 * 1024 // ~2MB
+        
+        // 计算这批文件的总内存需求
+        var totalMemoryNeeded = 0L
+        val chunkSizeBytes = 5 * 1024 * 1024L // 5MB 分片大小
+        
+        photos.forEach { photo ->
+            val fileSize = photo.localSize
+            // 加密后文件可能略大（假设增加5%）
+            val encryptedSize = (fileSize * 1.05).toLong()
+            
+            // 判断是否需要分片上传（视频或大于10MB的文件）
+            val needsChunking = fileSize > 10 * 1024 * 1024 || 
+                photo.localPath.let { path ->
+                    val mimeType = context.contentResolver.getType(android.net.Uri.fromFile(File(path)))
+                    mimeType?.startsWith("video/") == true
+                }
+            
+            if (needsChunking) {
+                // 分片上传：需要源文件 + 加密文件 + 分片缓冲区
+                totalMemoryNeeded += fileSize + encryptedSize + chunkSizeBytes + baseMemoryPerTask
+            } else {
+                // 直接上传：需要源文件 + 加密文件
+                totalMemoryNeeded += fileSize + encryptedSize + baseMemoryPerTask
+            }
+        }
+        
+        // 如果内存充足，尝试使用最大并发数3
+        // 否则根据可用内存计算
+        val maxConcurrency = 3
+        if (totalMemoryNeeded == 0L) {
+            return 1
+        }
+        
+        // 计算基于内存的并发数
+        val memoryBasedConcurrency = (usableMemory / (totalMemoryNeeded / photos.size)).toInt().coerceAtLeast(1)
+        
+        // 返回不超过3的并发数
+        return minOf(memoryBasedConcurrency, maxConcurrency, photos.size)
+    }
     
     /**
      * 执行完整同步
@@ -56,7 +119,6 @@ class SyncEngine(
             
             // 3. 批量上传（限制并发）
             val batchSize = 10
-            val concurrency = 2
             
             pendingPhotos.chunked(batchSize).forEach { batch ->
                 // 检查是否暂停
@@ -69,6 +131,8 @@ class SyncEngine(
                     return@withContext
                 }
                 
+                // 动态计算并发数（最大不超过3）
+                val concurrency = calculateOptimalConcurrency(batch)
                 uploadBatch(batch, concurrency)
             }
             
@@ -86,12 +150,16 @@ class SyncEngine(
         photos: List<net.kagamir.pickeep.data.local.entity.PhotoEntity>,
         concurrency: Int
     ) = withContext(Dispatchers.IO) {
+        // 创建分片上传器（用于视频和大文件）
+        val chunkedUploader = ChunkedUploader(storageClient, chunkSizeBytes = 5 * 1024 * 1024)
+        
         val uploadTask = UploadTask(
             context,
             database,
             storageClient,
             masterKey,
-            deviceId
+            deviceId,
+            chunkedUploader
         )
         
         // 使用 Semaphore 控制并发

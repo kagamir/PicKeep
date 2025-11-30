@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.work.Configuration
 import net.kagamir.pickeep.crypto.MasterKeyStore
 import net.kagamir.pickeep.data.local.PicKeepDatabase
+import org.opencv.android.OpenCVLoader
 
 /**
  * PicKeep 应用类
@@ -24,6 +25,15 @@ class PicKeepApplication : Application(), Configuration.Provider, Application.Ac
         
         // 初始化数据库
         database = PicKeepDatabase.getInstance(applicationContext)
+        
+        // 初始化OpenCV（用于视频指纹计算）
+        try {
+            if (!OpenCVLoader.initLocal()) {
+                android.util.Log.e("PicKeep", "OpenCV初始化失败")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("PicKeep", "OpenCV初始化异常", e)
+        }
         
         // 注册生命周期回调
         registerActivityLifecycleCallbacks(this)

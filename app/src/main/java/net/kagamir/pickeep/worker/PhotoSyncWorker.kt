@@ -8,11 +8,12 @@ import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.ensureActive
 import net.kagamir.pickeep.R
 import net.kagamir.pickeep.crypto.MasterKeyStore
 import net.kagamir.pickeep.data.local.PicKeepDatabase
@@ -75,42 +76,54 @@ class PhotoSyncWorker(
                 syncState
             )
             
-            // 监听同步状态并更新通知
-            val stateJob = CoroutineScope(Dispatchers.IO).launch {
-                syncState.state.collect { state ->
-                    if (state.isSyncing) {
-                        val message = if (state.isPaused) {
-                            "同步已暂停"
-                        } else if (state.currentFileName != null) {
-                            "正在上传: ${state.currentFileName} (${state.currentProgress}%)"
-                        } else {
-                            "同步中... (${state.syncedCount}/${state.pendingCount + state.syncedCount})"
+            // 使用 coroutineScope 确保所有协程在返回前完成
+            return coroutineScope {
+                // 监听同步状态并更新通知
+                val stateJob = launch(Dispatchers.IO) {
+                    try {
+                        syncState.state.collect { state ->
+                            ensureActive() // 检查是否已取消
+                            if (state.isSyncing) {
+                                val message = if (state.isPaused) {
+                                    "同步已暂停"
+                                } else if (state.currentFileName != null) {
+                                    "正在上传: ${state.currentFileName} (${state.currentProgress}%)"
+                                } else {
+                                    "同步中... (${state.syncedCount}/${state.pendingCount + state.syncedCount})"
+                                }
+                                setForeground(createForegroundInfo(message, state.totalProgress))
+                            }
                         }
-                        setForeground(createForegroundInfo(message, state.totalProgress))
+                    } catch (e: Exception) {
+                        // 忽略取消异常
+                        if (e !is kotlinx.coroutines.CancellationException) {
+                            android.util.Log.e("PhotoSyncWorker", "状态监听错误", e)
+                        }
                     }
                 }
-            }
-            
-            // 执行同步
-            syncEngine.syncPhotos()
-            
-            stateJob.cancel()
-            
-            // 获取最终状态
-            val finalState = syncState.state.first()
-            
-            if (finalState.failedCount > 0) {
-                showNotification(
-                    "同步完成（部分失败）",
-                    "成功: ${finalState.syncedCount}, 失败: ${finalState.failedCount}"
-                )
-                return Result.retry()
-            } else {
-                showNotification(
-                    "同步完成",
-                    "成功同步 ${finalState.syncedCount} 张照片"
-                )
-                return Result.success()
+                
+                // 执行同步
+                syncEngine.syncPhotos()
+                
+                // 取消状态监听并等待完成（确保所有 setForeground 调用都完成）
+                stateJob.cancelAndJoin()
+                
+                // 获取最终状态
+                val finalState = syncState.state.first()
+                
+                if (finalState.failedCount > 0) {
+                    showNotification(
+                        "同步完成（部分失败）",
+                        "成功: ${finalState.syncedCount}, 失败: ${finalState.failedCount}"
+                    )
+                    Result.retry()
+                } else {
+                    showNotification(
+                        "同步完成",
+                        "成功同步 ${finalState.syncedCount} 张照片"
+                    )
+                    Result.success()
+                }
             }
             
         } catch (e: Exception) {

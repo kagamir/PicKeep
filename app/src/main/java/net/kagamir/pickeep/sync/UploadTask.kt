@@ -13,6 +13,7 @@ import net.kagamir.pickeep.data.local.entity.ContentEncryptionKeyEntity
 import net.kagamir.pickeep.data.local.entity.PhotoEntity
 import net.kagamir.pickeep.data.local.entity.SyncStatus
 import net.kagamir.pickeep.storage.StorageClient
+import net.kagamir.pickeep.storage.webdav.ChunkedUploader
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -27,11 +28,17 @@ class UploadTask(
     private val database: PicKeepDatabase,
     private val storageClient: StorageClient,
     private val masterKey: ByteArray,
-    private val deviceId: String
+    private val deviceId: String,
+    private val chunkedUploader: ChunkedUploader? = null
 ) {
     
     private val photoDao = database.photoDao()
     private val cekDao = database.cekDao()
+    
+    companion object {
+        // 文件大小阈值：超过此大小的文件使用分片上传（10MB）
+        private const val CHUNK_UPLOAD_SIZE_THRESHOLD = 10 * 1024 * 1024L
+    }
     
     /**
      * 上传照片
@@ -60,10 +67,9 @@ class UploadTask(
             
             val encryptedFile = File(context.cacheDir, "${UUID.randomUUID()}.enc")
             val sha256 = try {
-                FileInputStream(sourceFile).use { input ->
-                    FileOutputStream(encryptedFile).use { output ->
-                        FileEncryptor.encryptFile(input, output, cek)
-                    }
+                FileOutputStream(encryptedFile).use { output ->
+                    // 使用文件路径版本，自动检测视频文件并使用相应的hash计算方法
+                    FileEncryptor.encryptFile(photo.localPath, output, cek)
                 }
             } catch (e: Exception) {
                 encryptedFile.delete()
@@ -76,14 +82,25 @@ class UploadTask(
             val remotePath = "$fileHash.enc"
             val remoteMetaPath = "$fileHash.meta"
             
-            // 4. 上传加密文件
-            val uploadResult = FileInputStream(encryptedFile).use { input ->
-                storageClient.uploadFile(
-                    input,
-                    remotePath,
-                    encryptedFile.length(),
-                    onProgress
-                )
+            // 4. 上传加密文件（根据文件类型和大小决定是否使用分片上传）
+            val encryptedFileSize = encryptedFile.length()
+            val mimeType = getMimeType(photo.localPath) ?: "application/octet-stream"
+            val isVideo = mimeType.startsWith("video/")
+            val shouldUseChunked = isVideo || encryptedFileSize > CHUNK_UPLOAD_SIZE_THRESHOLD
+            
+            val uploadResult = if (shouldUseChunked && chunkedUploader != null) {
+                // 使用分片上传（视频或大文件）
+                chunkedUploader.uploadFile(encryptedFile, remotePath, onProgress)
+            } else {
+                // 直接上传（小文件）
+                FileInputStream(encryptedFile).use { input ->
+                    storageClient.uploadFile(
+                        input,
+                        remotePath,
+                        encryptedFileSize,
+                        onProgress
+                    )
+                }
             }
             
             // 清理临时文件
