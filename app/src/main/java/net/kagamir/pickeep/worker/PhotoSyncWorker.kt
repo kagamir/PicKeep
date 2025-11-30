@@ -51,7 +51,7 @@ class PhotoSyncWorker(
             val masterKey = masterKeyStore.getMasterKey()
             
             // 获取 WebDAV 配置（使用 SettingsRepository）
-            val settingsRepository = net.kagamir.pickeep.data.repository.SettingsRepository(applicationContext)
+            val settingsRepository = net.kagamir.pickeep.data.repository.SettingsRepository(applicationContext, database)
             val webdavSettings = settingsRepository.webdavSettings.value
             
             if (!webdavSettings.isValid()) {

@@ -3,17 +3,19 @@ package net.kagamir.pickeep.data.repository
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import net.kagamir.pickeep.crypto.Bip39
 import net.kagamir.pickeep.crypto.MasterKeyStore
+import net.kagamir.pickeep.data.local.PicKeepDatabase
 
 /**
  * 设置仓库
  * 管理应用设置和配置
  */
-class SettingsRepository(context: Context) {
+class SettingsRepository(context: Context, private val database: PicKeepDatabase) {
     
     private val sharedPreferences: SharedPreferences
     private val masterKeyStore = MasterKeyStore.getInstance(context)
@@ -24,12 +26,16 @@ class SettingsRepository(context: Context) {
     private val _syncSettings = MutableStateFlow(SyncSettings())
     val syncSettings: StateFlow<SyncSettings> = _syncSettings.asStateFlow()
     
+    val isUnlockedFlow: StateFlow<Boolean> = masterKeyStore.isUnlockedFlow
+    
     init {
-        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
         sharedPreferences = EncryptedSharedPreferences.create(
-            "pickeep_settings",
-            masterKeyAlias,
             context,
+            "pickeep_settings",
+            masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
@@ -84,6 +90,13 @@ class SettingsRepository(context: Context) {
     }
     
     /**
+     * 重置上传记录
+     */
+    suspend fun resetUploadHistory() {
+        database.photoDao().deleteAll()
+    }
+    
+    /**
      * 获取 Master Key Store
      */
     fun getMasterKeyStore(): MasterKeyStore = masterKeyStore
@@ -95,9 +108,10 @@ class SettingsRepository(context: Context) {
     
     /**
      * 初始化（首次设置）
+     * 返回生成的助记词（如果未提供）
      */
-    fun initialize(password: String) {
-        masterKeyStore.initialize(password)
+    fun initialize(password: String, importMnemonic: List<String>? = null): List<String> {
+        return masterKeyStore.initialize(password, importMnemonic)
     }
     
     /**
@@ -122,13 +136,22 @@ class SettingsRepository(context: Context) {
         masterKeyStore.changePassword(oldPassword, newPassword)
     
     /**
-     * 导出恢复数据
+     * 导出恢复数据 (Legacy)
      */
     fun exportRecoveryData(): MasterKeyStore.RecoveryData? =
         masterKeyStore.exportRecoveryData()
+        
+    /**
+     * 导出助记词 (Requires Unlock)
+     */
+    fun exportMnemonic(): List<String> {
+        if (!isUnlocked()) throw IllegalStateException("Locked")
+        val mk = masterKeyStore.getMasterKey()
+        return Bip39.toMnemonic(mk)
+    }
     
     /**
-     * 从恢复数据导入
+     * 从恢复数据导入 (Legacy)
      */
     fun importFromRecovery(recoveryData: MasterKeyStore.RecoveryData, password: String) {
         masterKeyStore.importFromRecovery(recoveryData, password)
@@ -165,4 +188,3 @@ class SettingsRepository(context: Context) {
         const val KEY_SYNC_CHARGING_ONLY = "sync_charging_only"
     }
 }
-

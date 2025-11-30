@@ -1,10 +1,11 @@
 package net.kagamir.pickeep.sync
 
 import android.content.Context
-import android.provider.MediaStore
 import kotlinx.coroutines.delay
+import androidx.exifinterface.media.ExifInterface
 import net.kagamir.pickeep.crypto.CekManager
 import net.kagamir.pickeep.crypto.FileEncryptor
+import net.kagamir.pickeep.crypto.KeyDerivation
 import net.kagamir.pickeep.crypto.MetadataEncryptor
 import net.kagamir.pickeep.crypto.PhotoMetadata
 import net.kagamir.pickeep.data.local.PicKeepDatabase
@@ -69,9 +70,11 @@ class UploadTask(
                 throw e
             }
             
-            // 3. 生成远程路径（UUID）
-            val remotePath = "${UUID.randomUUID()}.enc"
-            val remoteMetaPath = remotePath.replace(".enc", ".meta")
+            // 3. 生成远程路径（基于文件内容的 HMAC-SHA256）
+            val filenameSalt = KeyDerivation.deriveFilenameSalt(masterKey)
+            val fileHash = KeyDerivation.calculateFileHash(sourceFile, filenameSalt)
+            val remotePath = "$fileHash.enc"
+            val remoteMetaPath = "$fileHash.meta"
             
             // 4. 上传加密文件
             val uploadResult = FileInputStream(encryptedFile).use { input ->
@@ -98,8 +101,7 @@ class UploadTask(
             
             val metaResult = storageClient.uploadMetadata(remoteMetaPath, encryptedMetadata)
             if (metaResult.isFailure) {
-                // 元数据上传失败，删除已上传的文件
-                storageClient.deleteFile(remotePath)
+                // 元数据上传失败
                 throw metaResult.exceptionOrNull() ?: Exception("元数据上传失败")
             }
             
@@ -225,38 +227,22 @@ class UploadTask(
      * 获取地理位置（如果有）
      */
     private fun getLocation(path: String): PhotoMetadata.Location? {
-        // 尝试从 MediaStore 获取位置信息
-        val uri = MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val projection = arrayOf(
-            MediaStore.Images.Media.LATITUDE,
-            MediaStore.Images.Media.LONGITUDE
-        )
-        val selection = "${MediaStore.Images.Media.DATA} = ?"
-        val selectionArgs = arrayOf(path)
-        
-        context.contentResolver.query(
-            uri,
-            projection,
-            selection,
-            selectionArgs,
-            null
-        )?.use { cursor ->
-            if (cursor.moveToFirst()) {
-                val latIndex = cursor.getColumnIndex(MediaStore.Images.Media.LATITUDE)
-                val lngIndex = cursor.getColumnIndex(MediaStore.Images.Media.LONGITUDE)
-                
-                if (latIndex >= 0 && lngIndex >= 0) {
-                    val lat = cursor.getDouble(latIndex)
-                    val lng = cursor.getDouble(lngIndex)
-                    
-                    if (lat != 0.0 && lng != 0.0) {
-                        return PhotoMetadata.Location(lat, lng)
-                    }
+        return try {
+            val exif = ExifInterface(path)
+            val latLong = FloatArray(2)
+            if (exif.getLatLong(latLong)) {
+                val lat = latLong[0].toDouble()
+                val lng = latLong[1].toDouble()
+                if (lat != 0.0 || lng != 0.0) {
+                    PhotoMetadata.Location(lat, lng)
+                } else {
+                    null
                 }
+            } else {
+                null
             }
+        } catch (e: Exception) {
+            null
         }
-        
-        return null
     }
 }
-

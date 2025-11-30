@@ -3,7 +3,10 @@ package net.kagamir.pickeep.crypto
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
 import kotlin.concurrent.write
@@ -18,12 +21,17 @@ class MasterKeyStore private constructor(context: Context) {
     private val sharedPreferences: SharedPreferences
     private val lock = ReentrantReadWriteLock()
     
+    private val _isUnlockedFlow = MutableStateFlow(false)
+    val isUnlockedFlow: StateFlow<Boolean> = _isUnlockedFlow.asStateFlow()
+    
     init {
-        val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        val masterKey = MasterKey.Builder(context)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
         sharedPreferences = EncryptedSharedPreferences.create(
-            "pickeep_secure_prefs",
-            masterKeyAlias,
             context.applicationContext,
+            "pickeep_secure_prefs",
+            masterKey,
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
@@ -44,10 +52,13 @@ class MasterKeyStore private constructor(context: Context) {
         }
         
         // 常量定义
-        private const val KEY_SALT = "kdf_salt"
         private const val KEY_ITERATIONS = "kdf_iterations"
         private const val KEY_INITIALIZED = "initialized"
-        private const val KEY_TEST_ENCRYPTED = "test_encrypted"
+        private const val KEY_TEST_ENCRYPTED = "test_encrypted" // Legacy verification
+        
+        // New Architecture Constants
+        private const val KEY_KEK_SALT = "kek_salt"
+        private const val KEY_WRAPPED_MASTER_KEY = "wrapped_master_key"
         
         // 扩展函数
         private fun ByteArray.toBase64(): String = 
@@ -61,80 +72,98 @@ class MasterKeyStore private constructor(context: Context) {
      * 检查是否已初始化（是否存在 KDF 参数）
      */
     fun isInitialized(): Boolean = lock.read {
-        sharedPreferences.contains(KEY_SALT)
+        sharedPreferences.contains(KEY_INITIALIZED)
     }
     
     /**
-     * 初始化（首次设置密码）
+     * 初始化（新版，支持助记词）
      * 
      * @param password 用户密码
-     * @param iterations KDF 迭代次数
+     * @param importMnemonic 导入的助记词（可选）
+     * @return 助记词（如果是生成的）或导入的助记词
      */
-    fun initialize(password: String, iterations: Int = 100_000) = lock.write {
+    fun initialize(password: String, importMnemonic: List<String>? = null): List<String> = lock.write {
         require(!isInitialized()) { "已经初始化过" }
         
-        val salt = KeyDerivation.generateSalt()
-        val masterKey = KeyDerivation.deriveMasterKey(password, salt, iterations)
+        val mnemonic = importMnemonic ?: KeyDerivation.generateMnemonic()
+        val masterKey = KeyDerivation.restoreMasterKey(mnemonic) // 32 bytes from mnemonic
         
-        // 保存 KDF 参数（不保存 master key）
+        // Generate KEK Salt
+        val kekSalt = KeyDerivation.generateSalt()
+        val iterations = 100_000
+        
+        // Derive KEK
+        val kek = KeyDerivation.deriveMasterKey(password, kekSalt, iterations)
+        
+        // Wrap Master Key
+        val wrappedMk = CekManager.encryptCek(masterKey, kek)
+        
+        // Create Verification Value (Test Encryption of a random CEK)
+        val testCek = CekManager.generateCek()
+        val testEncrypted = CekManager.encryptCek(testCek, masterKey)
+        
+        // Save
         sharedPreferences.edit()
-            .putString(KEY_SALT, salt.toBase64())
+            .putString(KEY_KEK_SALT, kekSalt.toBase64())
+            .putString(KEY_WRAPPED_MASTER_KEY, wrappedMk.toBase64())
+            .putString(KEY_TEST_ENCRYPTED, testEncrypted.toBase64())
             .putInt(KEY_ITERATIONS, iterations)
             .putBoolean(KEY_INITIALIZED, true)
             .apply()
         
-        // 缓存到内存
         masterKeyCache = masterKey
+        _isUnlockedFlow.value = true
+        
+        return mnemonic
     }
     
     /**
-     * 解锁（用密码派生 Master Key）
-     * 
-     * @param password 用户密码
-     * @return 是否解锁成功
+     * 解锁
      */
     fun unlock(password: String): Boolean = lock.write {
         require(isInitialized()) { "尚未初始化" }
         
-        val salt = sharedPreferences.getString(KEY_SALT, null)
-            ?.fromBase64() ?: return false
+        val kekSalt = sharedPreferences.getString(KEY_KEK_SALT, null)?.fromBase64() ?: return false
         val iterations = sharedPreferences.getInt(KEY_ITERATIONS, 100_000)
+        val wrappedMk = sharedPreferences.getString(KEY_WRAPPED_MASTER_KEY, null)?.fromBase64() ?: return false
         
         try {
-            val masterKey = KeyDerivation.deriveMasterKey(password, salt, iterations)
+            val kek = KeyDerivation.deriveMasterKey(password, kekSalt, iterations)
+            val masterKey = CekManager.decryptCek(wrappedMk, kek)
             
-            // 验证密码（通过尝试解密一个测试值）
-            if (sharedPreferences.contains(KEY_TEST_ENCRYPTED)) {
-                val testEncrypted = sharedPreferences.getString(KEY_TEST_ENCRYPTED, null)
-                    ?.fromBase64() ?: return false
-                try {
-                    CekManager.decryptCek(testEncrypted, masterKey)
-                } catch (e: Exception) {
-                    // 解密失败，密码错误
-                    return false
-                }
-            } else {
-                // 首次解锁，创建测试值
-                val testCek = CekManager.generateCek()
-                val testEncrypted = CekManager.encryptCek(testCek, masterKey)
-                sharedPreferences.edit()
-                    .putString(KEY_TEST_ENCRYPTED, testEncrypted.toBase64())
-                    .apply()
+            // Verify
+            if (!verifyMasterKey(masterKey)) {
+                return false
             }
             
             masterKeyCache = masterKey
+            _isUnlockedFlow.value = true
             return true
         } catch (e: Exception) {
             return false
         }
     }
     
+    private fun verifyMasterKey(masterKey: ByteArray): Boolean {
+        if (sharedPreferences.contains(KEY_TEST_ENCRYPTED)) {
+            val testEncrypted = sharedPreferences.getString(KEY_TEST_ENCRYPTED, null)?.fromBase64() ?: return false
+            try {
+                CekManager.decryptCek(testEncrypted, masterKey)
+                return true
+            } catch (e: Exception) {
+                return false
+            }
+        }
+        return true // Should not happen for initialized store
+    }
+    
     /**
-     * 锁定（清除内存中的 Master Key）
+     * 锁定
      */
     fun lock() = lock.write {
         masterKeyCache?.fill(0)
         masterKeyCache = null
+        _isUnlockedFlow.value = false
     }
     
     /**
@@ -153,72 +182,64 @@ class MasterKeyStore private constructor(context: Context) {
     
     /**
      * 修改密码
-     * 
-     * @param oldPassword 旧密码
-     * @param newPassword 新密码
-     * @return 是否成功
      */
     fun changePassword(oldPassword: String, newPassword: String): Boolean = lock.write {
-        if (!unlock(oldPassword)) {
-            return false
+        if (!isUnlocked()) {
+            if (!unlock(oldPassword)) {
+                return false
+            }
         }
         
-        val salt = KeyDerivation.generateSalt()
+        val masterKey = masterKeyCache ?: return false
         val iterations = sharedPreferences.getInt(KEY_ITERATIONS, 100_000)
-        val newMasterKey = KeyDerivation.deriveMasterKey(newPassword, salt, iterations)
         
-        // 重新加密测试值
-        val testCek = CekManager.generateCek()
-        val testEncrypted = CekManager.encryptCek(testCek, newMasterKey)
+        // Re-wrap with new password
+        val newKekSalt = KeyDerivation.generateSalt()
+        val newKek = KeyDerivation.deriveMasterKey(newPassword, newKekSalt, iterations)
+        val newWrappedMk = CekManager.encryptCek(masterKey, newKek)
         
         sharedPreferences.edit()
-            .putString(KEY_SALT, salt.toBase64())
-            .putString(KEY_TEST_ENCRYPTED, testEncrypted.toBase64())
+            .putString(KEY_KEK_SALT, newKekSalt.toBase64())
+            .putString(KEY_WRAPPED_MASTER_KEY, newWrappedMk.toBase64())
             .apply()
-        
-        masterKeyCache = newMasterKey
+            
         return true
     }
     
     /**
-     * 导出恢复码（用于备份/多设备）
-     * 返回 salt 和 iterations，用户需要记住密码
+     * 导出恢复数据
+     * Deprecated: New architecture uses Mnemonic recovery. 
+     * This method will return null for new architecture.
      */
     fun exportRecoveryData(): RecoveryData? = lock.read {
-        if (!isInitialized()) return null
-        
-        val salt = sharedPreferences.getString(KEY_SALT, null) ?: return null
-        val iterations = sharedPreferences.getInt(KEY_ITERATIONS, 100_000)
-        
-        return RecoveryData(salt, iterations)
+        return null
     }
     
     /**
-     * 从恢复数据导入
+     * 导出助记词 (Requires Unlock)
      */
-    fun importFromRecovery(recoveryData: RecoveryData, password: String) = lock.write {
-        val salt = recoveryData.salt.fromBase64()
-        val masterKey = KeyDerivation.deriveMasterKey(password, salt, recoveryData.iterations)
-        
-        sharedPreferences.edit()
-            .putString(KEY_SALT, recoveryData.salt)
-            .putInt(KEY_ITERATIONS, recoveryData.iterations)
-            .putBoolean(KEY_INITIALIZED, true)
-            .apply()
-        
-        // 创建测试值
-        val testCek = CekManager.generateCek()
-        val testEncrypted = CekManager.encryptCek(testCek, masterKey)
-        sharedPreferences.edit()
-            .putString(KEY_TEST_ENCRYPTED, testEncrypted.toBase64())
-            .apply()
-        
-        masterKeyCache = masterKey
+    fun exportMnemonic(): List<String> = lock.read {
+        val mk = getMasterKey()
+        return Bip39.toMnemonic(mk)
+    }
+
+    /**
+     * 从助记词导入恢复 (Legacy method name, repurposed or deprecated)
+     * Actually we have importFromMnemonic in SettingsRepository which calls initialize.
+     * This legacy method signature (RecoveryData) is no longer useful.
+     * But to keep interface clean we can remove it or throw exception.
+     */
+    fun importFromRecovery(recoveryData: RecoveryData, password: String): Unit = lock.write {
+        throw UnsupportedOperationException("Legacy recovery not supported")
     }
     
+    fun importFromMnemonic(mnemonic: String, password: String) {
+        val words = mnemonic.trim().split("\\s+".toRegex())
+        initialize(password, words)
+    }
+
     data class RecoveryData(
-        val salt: String,  // Base64 编码
+        val salt: String,
         val iterations: Int
     )
 }
-

@@ -36,7 +36,7 @@ class MainActivity : ComponentActivity() {
         
         // 初始化
         database = PicKeepDatabase.getInstance(applicationContext)
-        settingsRepository = SettingsRepository(applicationContext)
+        settingsRepository = SettingsRepository(applicationContext, database)
         workManagerScheduler = WorkManagerScheduler(applicationContext)
         
         setContent {
@@ -49,6 +49,7 @@ class MainActivity : ComponentActivity() {
     @Composable
     private fun MainContent() {
         var hasPermissions by remember { mutableStateOf(PermissionHelper.hasAllPermissions(this)) }
+        val isUnlocked by settingsRepository.isUnlockedFlow.collectAsState()
         
         // 权限请求启动器
         val permissionLauncher = rememberLauncherForActivityResult(
@@ -67,6 +68,20 @@ class MainActivity : ComponentActivity() {
         if (hasPermissions) {
             // 权限已授予，显示主界面
             val navController = rememberNavController()
+            
+            // 监听锁定状态
+            LaunchedEffect(isUnlocked) {
+                if (!isUnlocked && settingsRepository.isInitialized()) {
+                    // 如果已初始化但被锁定，跳转到解锁界面
+                    // 检查当前是否已经在解锁界面，避免重复跳转（简单处理）
+                    if (navController.currentDestination?.route != Routes.UNLOCK) {
+                        navController.navigate(Routes.UNLOCK) {
+                            // 清除回退栈，防止返回
+                            popUpTo(0)
+                        }
+                    }
+                }
+            }
             
             // 确定起始路由
             val startDestination = when {

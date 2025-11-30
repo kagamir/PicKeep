@@ -72,5 +72,8 @@ interface PhotoDao {
     
     @Query("SELECT COUNT(*) FROM photos")
     suspend fun getTotalCount(): Int
+
+    @Query("DELETE FROM photos")
+    suspend fun deleteAll()
 }
 

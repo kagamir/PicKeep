@@ -33,6 +33,7 @@ fun SettingsScreen(
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var saveResult by remember { mutableStateOf<String?>(null) }
+    var showResetDialog by remember { mutableStateOf(false) }
     
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -53,6 +54,32 @@ fun SettingsScreen(
             syncOnlyOnWifi = settings.syncOnlyOnWifi
             syncOnlyWhenCharging = settings.syncOnlyWhenCharging
         }
+    }
+    
+    if (showResetDialog) {
+        AlertDialog(
+            onDismissRequest = { showResetDialog = false },
+            title = { Text("重置上传记录") },
+            text = { Text("确定要清除所有本地上传记录吗？这不会删除服务器上的文件，但会导致下次同步时重新扫描所有照片。如果服务器上已存在同名文件，它们将被覆盖。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        scope.launch {
+                            settingsRepository.resetUploadHistory()
+                            showResetDialog = false
+                            snackbarHostState.showSnackbar("上传记录已重置")
+                        }
+                    }
+                ) {
+                    Text("确定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showResetDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
     
     Scaffold(
@@ -187,7 +214,7 @@ fun SettingsScreen(
                 )
             }
             
-            Divider()
+            HorizontalDivider()
             
             // 同步设置
             Text(
@@ -281,7 +308,22 @@ fun SettingsScreen(
                     }
                 )
             }
+            
+            HorizontalDivider()
+            
+            // 高级设置
+            Text(
+                text = "高级设置",
+                style = MaterialTheme.typography.titleMedium
+            )
+            
+            Button(
+                onClick = { showResetDialog = true },
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("重置上传记录")
+            }
         }
     }
 }
-

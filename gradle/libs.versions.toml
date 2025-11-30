@@ -36,6 +36,9 @@ kotlinxSerialization = "1.7.3"
 # Security
 securityCrypto = "1.1.0-alpha06"
 
+# Exif
+exifInterface = "1.3.7"
+
 # Bouncy Castle
 bouncyCastle = "1.78.1"
 
@@ -84,6 +87,9 @@ kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 
 # Security
 androidx-security-crypto = { group = "androidx.security", name = "security-crypto", version.ref = "securityCrypto" }
+
+# Exif
+androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifInterface" }
 
 # Bouncy Castle
 bouncycastle-bcprov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bouncyCastle" }

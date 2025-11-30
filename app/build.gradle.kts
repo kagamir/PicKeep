@@ -88,6 +88,7 @@ dependencies {
     
     // Security
     implementation(libs.androidx.security.crypto)
+    implementation(libs.androidx.exifinterface)
     
     // Bouncy Castle for crypto
     implementation(libs.bouncycastle.bcprov)

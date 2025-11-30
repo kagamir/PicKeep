@@ -1,8 +1,12 @@
 package net.kagamir.pickeep.crypto
 
+import java.io.File
+import java.io.FileInputStream
 import java.security.SecureRandom
+import javax.crypto.Mac
 import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * 密钥派生工具
@@ -62,6 +66,56 @@ object KeyDerivation {
     }
     
     /**
+     * 生成文件名哈希盐
+     * 从 Master Key 派生一个专用的盐
+     */
+    fun deriveFilenameSalt(masterKey: ByteArray): ByteArray {
+        val hmac = javax.crypto.Mac.getInstance("HmacSHA256")
+        val secretKey = javax.crypto.spec.SecretKeySpec(masterKey, "HmacSHA256")
+        hmac.init(secretKey)
+        return hmac.doFinal("filename_salt".toByteArray())
+    }
+
+    /**
+     * 计算文件内容的哈希
+     * HMAC-SHA256(Content, Salt)
+     */
+    fun calculateFileHash(file: java.io.File, salt: ByteArray): String {
+        val hmac = javax.crypto.Mac.getInstance("HmacSHA256")
+        val secretKey = javax.crypto.spec.SecretKeySpec(salt, "HmacSHA256")
+        hmac.init(secretKey)
+        
+        val buffer = ByteArray(8192)
+        java.io.FileInputStream(file).use { input ->
+            var bytesRead: Int
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                hmac.update(buffer, 0, bytesRead)
+            }
+        }
+        
+        val hash = hmac.doFinal()
+        return hash.joinToString("") { "%02x".format(it) }
+    }
+    
+    /**
+     * 生成助记词（使用 BIP39）
+     */
+    fun generateMnemonic(): List<String> {
+        val entropy = ByteArray(16) // 128 bits -> 12 words
+        SecureRandom().nextBytes(entropy)
+        return Bip39.toMnemonic(entropy)
+    }
+
+    /**
+     * 从助记词恢复 Master Key
+     */
+    fun restoreMasterKey(mnemonic: List<String>): ByteArray {
+        // BIP39 seed (512 bits) -> Take first 256 bits as Master Key
+        val seed = Bip39.toSeed(mnemonic)
+        return seed.copyOf(32)
+    }
+
+    /**
      * 生成助记词（简化版本，实际可用 BIP39）
      * 这里使用 Base32 编码的随机字节作为恢复码
      */
@@ -97,4 +151,3 @@ object KeyDerivation {
         return result.chunked(4).joinToString("-")
     }
 }
-
