@@ -1,241 +1,240 @@
-# PicKeep - 零知识加密照片备份
+# PicKeep - Zero-Knowledge Encrypted Photo Backup 🔐📸
 
-PicKeep 是一个 Android 应用，提供零知识加密的照片备份服务。所有照片在本地进行端到端加密，服务器无法读取您的照片内容。
+PicKeep is an Android app that provides a **zero-knowledge encrypted photo backup** service. All photos are encrypted locally end-to-end, and the server **cannot read any of your photo content**. 🧱
 
-## 核心特性
+## Core Features ✨
 
-### 零知识加密
-- **端到端加密**：照片和元数据在上传前进行 AES-256-GCM 加密
-- **BIP39 助记词**：使用 12 词助记词生成主密钥，支持多设备恢复
-- **密钥派生**：使用 PBKDF2-HMAC-SHA256（100,000 次迭代）从用户密码派生密钥加密密钥（KEK）
-- **独立密钥**：每个文件使用独立的内容加密密钥（CEK），用主密钥加密后存储
-- **隐私保护**：远程文件名基于文件内容的 HMAC-SHA256，不泄露任何元数据
+### Zero-Knowledge Encryption 🔒
+- **End-to-end encryption**: Photos and metadata are encrypted with **AES-256-GCM** before upload.
+- **BIP39 mnemonic**: 12-word mnemonic phrase is used to derive the master key, supporting multi-device recovery.
+- **Key derivation**: Uses **PBKDF2-HMAC-SHA256** (100,000 iterations) to derive a Key Encryption Key (KEK) from the user password.
+- **Per-file keys**: Each file uses an independent Content Encryption Key (CEK), which is encrypted with the master key and stored.
+- **Privacy-preserving filenames**: Remote filenames are based on an **HMAC-SHA256** of file content and reveal no metadata.
 
-### 增量同步
-- **智能检测**：通过 MediaStore 监控照片和视频变化，检测修改时间和大小
-- **分片上传**：大文件（>10MB）和视频自动使用 5MB 分片上传
-- **动态并发**：根据可用内存自动调整并发数（1-3 个并发任务）
-- **智能重试**：指数退避重试机制（最多 5 次），HTTP 4xx 错误不重试
-- **状态管理**：完整的同步状态追踪，包括哈希计算、加密、上传等步骤
-- **进度显示**：实时显示每个文件的上传进度和当前步骤
+### Incremental Sync 🔁
+- **Smart detection**: Monitors photo and video changes via MediaStore, checking modification time and size.
+- **Chunked upload**: Large files (>10MB) and videos are automatically uploaded in **5MB chunks**.
+- **Dynamic concurrency**: Automatically adjusts concurrency (1–3 parallel tasks) based on available memory.
+- **Smart retry**: Exponential backoff retry mechanism (up to 5 times); HTTP 4xx errors are not retried.
+- **State management**: Tracks full sync state, including hashing, encryption, upload and more.
+- **Progress display**: Shows real-time upload progress and current step for each file. 📊
 
-### WebDAV 支持
-- **标准协议**：兼容 Nextcloud、ownCloud 等 WebDAV 服务
-- **TLS 加密**：传输层使用 HTTPS 保护
-- **灵活配置**：支持自定义服务器地址和认证
+### WebDAV Support ☁️
+- **Standard protocol**: Compatible with WebDAV services such as Nextcloud and ownCloud.
+- **TLS encryption**: Uses HTTPS for secure transport.
+- **Flexible configuration**: Supports custom server URL and authentication.
 
-### 后台任务
-- **WorkManager**：使用 Android WorkManager 进行后台同步
-- **智能调度**：可配置同步间隔（1-24 小时）、网络条件（仅 WiFi）、充电状态
-- **前台服务**：同步时显示进度通知，包含当前上传文件和步骤信息
-- **应用锁定**：应用进入后台 5 分钟后自动锁定，主密钥从内存清除
+### Background Tasks ⚙️
+- **WorkManager**: Uses Android WorkManager for background sync.
+- **Smart scheduling**: Configurable sync interval (1–24 hours), network conditions (Wi‑Fi only), and charging state.
+- **Foreground service**: Shows progress notification during sync, including current file and step.
+- **App lock**: App auto-locks 5 minutes after going to background, and the master key is wiped from memory. 🔐
 
-## 技术架构
+## Technical Architecture 🧩
 
-### 依赖库
-- **Jetpack Compose**：现代化的声明式 UI
-- **Room**：本地数据库，存储照片元数据和同步状态
-- **WorkManager**：后台任务调度
-- **OkHttp**：HTTP 客户端，实现 WebDAV 协议
-- **Kotlinx Serialization**：JSON 序列化
-- **EncryptedSharedPreferences**：安全存储敏感配置（WebDAV 凭据等）
-- **Bouncy Castle**：加密库支持（AES-GCM）
-- **AndroidX ExifInterface**：读取照片元数据（地理位置等）
+### Dependencies 📚
+- **Jetpack Compose**: Modern declarative UI.
+- **Room**: Local database for photo metadata and sync state.
+- **WorkManager**: Background task scheduling.
+- **OkHttp**: HTTP client implementing WebDAV operations.
+- **Kotlinx Serialization**: JSON serialization.
+- **EncryptedSharedPreferences**: Secure storage for sensitive configuration (WebDAV credentials, etc).
+- **Bouncy Castle**: Crypto implementation (AES-GCM).
+- **AndroidX ExifInterface**: Read photo metadata (such as geolocation).
 
-### 项目结构
+### Project Structure 📁
 ```
 app/src/main/java/net/kagamir/pickeep/
-├── crypto/                  # 加密层
-│   ├── Bip39.kt            # BIP39 助记词实现
-│   ├── KeyDerivation.kt    # 密钥派生（PBKDF2）
-│   ├── CekManager.kt       # CEK 管理（生成、加密、解密）
-│   ├── FileEncryptor.kt    # 文件加密（AES-256-GCM）
-│   ├── MetadataEncryptor.kt # 元数据加密
-│   ├── PhotoMetadata.kt    # 照片元数据模型
-│   └── MasterKeyStore.kt   # 主密钥管理（锁定、解锁、密码修改）
+├── crypto/                      # Crypto layer
+│   ├── Bip39.kt                 # BIP39 mnemonic implementation
+│   ├── KeyDerivation.kt         # Key derivation (PBKDF2)
+│   ├── CekManager.kt            # CEK management (generation, encrypt, decrypt)
+│   ├── FileEncryptor.kt         # File encryption (AES-256-GCM)
+│   ├── MetadataEncryptor.kt     # Metadata encryption
+│   ├── PhotoMetadata.kt         # Photo metadata model
+│   └── MasterKeyStore.kt        # Master key management (lock, unlock, password change)
 ├── data/
-│   ├── local/              # 本地数据
-│   │   ├── entity/        # 数据实体
-│   │   ├── dao/           # 数据访问对象
+│   ├── local/                   # Local data
+│   │   ├── entity/              # Entities
+│   │   ├── dao/                 # Data Access Objects
 │   │   └── PicKeepDatabase.kt
-│   └── repository/         # 数据仓库
-├── storage/                # 存储层
-│   ├── StorageClient.kt    # 存储客户端接口
-│   ├── RemoteFileInfo.kt   # 远程文件信息
-│   └── webdav/            # WebDAV 实现
-│       ├── WebDavClient.kt # WebDAV 客户端
-│       └── ChunkedUploader.kt # 分片上传器
-├── monitor/                # 监控层
+│   └── repository/              # Repositories
+├── storage/                     # Storage layer
+│   ├── StorageClient.kt         # Storage client interface
+│   ├── RemoteFileInfo.kt        # Remote file info
+│   └── webdav/                  # WebDAV implementation
+│       ├── WebDavClient.kt      # WebDAV client
+│       └── ChunkedUploader.kt   # Chunked uploader
+├── monitor/                     # Monitoring layer
 │   ├── MediaStoreObserver.kt
 │   ├── FileSystemObserver.kt
-│   └── PhotoScanner.kt     # 照片扫描器（MediaStore 查询）
-├── sync/                   # 同步引擎
-│   ├── SyncEngine.kt       # 同步引擎（批量上传、并发控制）
-│   ├── UploadTask.kt       # 上传任务（单文件上传流程）
-│   └── SyncState.kt        # 同步状态管理（单例）
-├── worker/                 # 后台任务
+│   └── PhotoScanner.kt          # Photo scanner (MediaStore queries)
+├── sync/                        # Sync engine
+│   ├── SyncEngine.kt            # Sync engine (batch upload, concurrency control)
+│   ├── UploadTask.kt            # Upload task (per-file upload pipeline)
+│   └── SyncState.kt             # Sync state management (singleton)
+├── worker/                      # Background workers
 │   ├── PhotoSyncWorker.kt
 │   └── WorkManagerScheduler.kt
-└── ui/                     # UI 层
-    ├── screen/            # 界面
-    │   ├── SetupScreen.kt      # 初始化界面（创建/恢复账户）
-    │   ├── UnlockScreen.kt     # 解锁界面
-    │   ├── SyncStatusScreen.kt # 同步状态界面（主界面）
-    │   └── SettingsScreen.kt   # 设置界面
-    ├── navigation/        # 导航
-    │   └── NavGraph.kt    # 导航图
-    └── theme/             # 主题
-        ├── Color.kt       # 颜色定义
-        ├── Theme.kt       # Material3 主题
-        └── Type.kt        # 字体样式
+└── ui/                          # UI layer
+    ├── screen/                  # Screens
+    │   ├── SetupScreen.kt       # Initial setup (create/restore account)
+    │   ├── UnlockScreen.kt      # Unlock screen
+    │   ├── SyncStatusScreen.kt  # Sync status screen (main)
+    │   └── SettingsScreen.kt    # Settings screen
+    ├── navigation/              # Navigation
+    │   └── NavGraph.kt          # Navigation graph
+    └── theme/                   # Theme
+        ├── Color.kt             # Color definitions
+        ├── Theme.kt             # Material3 theme
+        └── Type.kt              # Typography
 ```
 
-## 安全设计
+## Security Design 🔐
 
-### 加密方案
-1. **主密钥（Master Key）**
-   - 从 BIP39 助记词（12 词）派生，使用 BIP39 标准（PBKDF2WithHmacSHA512，2048 次迭代）
-   - 取种子（seed）的前 256 位作为主密钥
-   - 仅存储在内存中，应用锁定时清除
-   - 支持导出助记词用于多设备恢复
+### Cryptographic Scheme 🧠
+1. **Master Key**
+   - Derived from a 12-word BIP39 mnemonic using the BIP39 standard (PBKDF2WithHmacSHA512, 2048 iterations).
+   - Uses the first 256 bits of the seed as the master key.
+   - Stored **only in memory** and cleared when the app is locked.
+   - Can be exported as a mnemonic for multi-device recovery.
 
-2. **密钥加密密钥（KEK）**
-   - 从用户密码通过 PBKDF2-HMAC-SHA256 派生（100,000 次迭代）
-   - 用于加密包装主密钥，存储在 EncryptedSharedPreferences 中
-   - 修改密码时重新包装主密钥，无需重新加密文件
+2. **Key Encryption Key (KEK)**
+   - Derived from the user password using PBKDF2-HMAC-SHA256 (100,000 iterations).
+   - Used to wrap (encrypt) the master key and store it in `EncryptedSharedPreferences`.
+   - When changing password, only the wrapped master key is re-encrypted; files do not need to be re-encrypted.
 
-3. **内容加密密钥（CEK）**
-   - 每个文件独立生成 256-bit 随机密钥
-   - 用主密钥加密后存储在本地数据库（Room）
-   - 支持密钥轮换和撤销
+3. **Content Encryption Key (CEK)**
+   - A unique 256-bit random key is generated for each file.
+   - CEK is encrypted with the master key and stored in the local Room database.
+   - Supports key rotation and revocation.
 
-4. **文件加密**
-   - 算法：AES-256-GCM
-   - 模式：流式加密（64KB 分块）
-   - IV：每个文件使用随机 12 字节 IV
-   - 认证：包含 16 字节认证标签，防止篡改
-   - 格式：`[版本号(1字节)][IV(12字节)][密文...][标签(16字节)]`
+4. **File Encryption**
+   - Algorithm: **AES-256-GCM**.
+   - Mode: streaming encryption (64KB chunks).
+   - IV: random 12‑byte IV per file.
+   - Authentication: includes a 16‑byte authentication tag to prevent tampering.
+   - Format: `[version(1 byte)][IV(12 bytes)][ciphertext...][tag(16 bytes)]`.
 
-5. **元数据加密**
-   - 原始文件名、时间戳、地理位置、MIME 类型等信息全部加密
-   - 使用与文件相同的 CEK 加密
-   - 单独上传到 `.meta` 文件，服务器无法索引或搜索
+5. **Metadata Encryption**
+   - Original filename, timestamps, geolocation, MIME type and other metadata are fully encrypted.
+   - Encrypted with the same CEK as the file.
+   - Uploaded separately as a `.meta` file so the server cannot index or search metadata.
 
-### 隐私保护
-- 远程文件名基于文件内容的 HMAC-SHA256（使用主密钥派生的盐），不泄露任何信息
-- 不上传明文哈希，防止服务器识别文件内容
-- 每个设备独立的设备 ID（UUID），但不关联用户身份
-- 元数据完全加密，包括 EXIF 地理位置信息
+### Privacy Protection 🕵️
+- Remote filenames are derived from file content using HMAC-SHA256 (with a salt derived from the master key), revealing no information.
+- No plaintext hashes are uploaded, preventing the server from recognizing file content.
+- Each device has its own device ID (UUID) that is not linked to user identity.
+- All metadata, including EXIF geolocation, is fully encrypted.
 
-## 使用指南
+## Usage Guide 📖
 
-### 初始设置
-1. **首次启动**：应用会引导您完成初始化流程
-2. **创建账户**：
-   - 设置密码（至少 12 位，包含大小写字母和数字）
-   - 系统会生成 12 词 BIP39 助记词
-   - **重要**：请妥善保存助记词，建议离线记录（纸质或密码管理器）
-3. **恢复账户**：如果已有助记词，可以选择"使用助记词恢复"
-4. **授予权限**：授予照片和媒体访问权限
+### Initial Setup 🚀
+1. **First launch**: The app guides you through the initialization flow.
+2. **Create account**:
+   - Set a password (at least 12 characters, including upper/lowercase letters and digits).
+   - The system generates a 12-word BIP39 mnemonic.
+   - **Important**: Store the mnemonic safely, preferably offline (paper or password manager).
+3. **Recover account**: If you already have a mnemonic, choose “Restore with mnemonic”.
+4. **Grant permissions**: Grant photo and media access.
 
-### 配置 WebDAV
-1. 进入设置界面
-2. 输入 WebDAV 服务器地址（例如：`https://cloud.example.com/remote.php/webdav`）
-3. 输入用户名和密码
-4. 点击"测试连接"验证配置
-5. 保存设置
+### Configure WebDAV 🌐
+1. Go to the settings screen.
+2. Enter your WebDAV server address (e.g. `https://cloud.example.com/remote.php/webdav`).
+3. Enter username and password.
+4. Tap **“Test connection”** to verify configuration.
+5. Save the settings.
 
-### 同步设置
-- **自动同步**：启用后定期自动备份
-- **同步间隔**：1-24 小时可选（默认 12 小时）
-- **WiFi 限制**：仅在 WiFi 下同步，节省流量（默认启用）
-- **充电限制**：仅在充电时同步，节省电量（默认关闭）
-- **监控格式**：可配置监控的文件后缀（默认：jpg, jpeg, png, gif, webp, heic, heif, mp4, mkv, avi, mov, 3gp）
+### Sync Settings ⚙️
+- **Auto sync**: When enabled, backups run periodically.
+- **Sync interval**: Configurable from 1 to 24 hours (default 12 hours).
+- **Wi‑Fi only**: Sync only on Wi‑Fi to save mobile data (enabled by default).
+- **Charging only**: Sync only while charging to save battery (disabled by default).
+- **Monitored formats**: Configurable file extensions (default: `jpg, jpeg, png, gif, webp, heic, heif, mp4, mkv, avi, mov, 3gp`).
 
-### 手动同步
-点击主界面的同步按钮立即开始同步。同步过程中可以：
-- 查看实时进度和当前上传的文件
-- 暂停/继续同步
-- 取消同步
+### Manual Sync ▶️
+Tap the sync button on the main screen to start sync immediately. During sync you can:
+- View real-time progress and which file is currently uploading.
+- Pause / resume sync.
+- Cancel sync.
 
-### 上传流程
-每个文件的上传包含以下步骤：
-1. **计算哈希**：计算文件的 SHA-256 哈希值
-2. **加密文件**：使用 AES-256-GCM 加密文件
-3. **生成路径**：基于文件内容生成远程路径
-4. **上传文件**：上传加密文件（大文件自动分片）
-5. **上传元数据**：上传加密的元数据文件
+### Upload Pipeline 📦
+Each file upload includes the following steps:
+1. **Compute hash**: Calculate SHA‑256 hash of the file.
+2. **Encrypt file**: Encrypt the file using AES‑256‑GCM.
+3. **Generate path**: Generate the remote path based on file content.
+4. **Upload file**: Upload the encrypted file (large files are chunked automatically).
+5. **Upload metadata**: Upload the encrypted metadata file.
 
-## 恢复与多设备
+## Recovery & Multi‑Device Use 📱💾
 
-### 导出助记词
-1. 在设置中选择"导出助记词"（需要先解锁应用）
-2. 妥善保存 12 词助记词（建议离线保存，如纸质或密码管理器）
-3. **警告**：丢失助记词和密码将无法恢复数据
+### Export Mnemonic
+1. In settings, choose **“Export mnemonic”** (requires app to be unlocked).
+2. Store the 12-word mnemonic safely (offline, e.g. paper or password manager).
+3. **Warning**: If you lose both mnemonic and password, your data cannot be recovered.
 
-### 在新设备上恢复
-1. 安装应用后选择"使用助记词恢复"
-2. 输入 12 词助记词和原密码
-3. 配置相同的 WebDAV 服务器
-4. 应用将同步所有加密照片和元数据
+### Restore on a New Device
+1. After installation, choose **“Restore with mnemonic”**.
+2. Enter the 12-word mnemonic and the original password.
+3. Configure the same WebDAV server.
+4. The app will sync all encrypted photos and metadata.
 
-### 修改密码
-1. 在设置中选择"修改密码"
-2. 输入旧密码和新密码
-3. 系统会重新包装主密钥，无需重新加密文件
+### Change Password
+1. In settings, choose **“Change password”**.
+2. Enter old password and new password.
+3. The system re-wraps the master key; files do **not** need to be re-encrypted.
 
-## 限制与注意事项
+## Limitations & Notes ⚠️
 
-### 当前版本限制
-- WebDAV 分片上传需要服务器支持 PUT 方法的分片上传
-- 大文件（>100MB）和视频可能需要较长时间，建议在 WiFi 和充电状态下同步
-- 冲突解决采用简化策略（保留所有版本，使用设备 ID 区分）
-- 应用进入后台 5 分钟后自动锁定，需要重新输入密码解锁
+### Current Limitations
+- WebDAV chunked upload requires the server to support `PUT` with partial/chunked uploads.
+- Large files (>100MB) and videos may take a long time to upload; it is recommended to sync on Wi‑Fi while charging.
+- Conflict resolution is simplified: all versions are kept and distinguished by device ID.
+- The app auto-locks 5 minutes after going to background; you must re-enter the password to unlock.
 
-### 安全建议
-- 使用强密码（推荐密码管理器生成，至少 12 位）
-- **必须**妥善保存助记词（离线保存，如纸质或密码管理器）
-- 使用可信的 WebDAV 服务器（建议自建 Nextcloud/ownCloud）
-- 启用 WebDAV 服务器的 TLS 加密（HTTPS）
-- 定期检查同步状态，确保重要照片已备份
+### Security Recommendations 🛡️
+- Use a strong password (password manager recommended, at least 12 characters).
+- **You must** keep your mnemonic safe (preferably offline, such as paper or a password manager).
+- Use a trusted WebDAV server (self-hosted Nextcloud/ownCloud recommended).
+- Enable TLS (HTTPS) on your WebDAV server.
+- Check sync status regularly to ensure important photos are backed up.
 
-### 性能建议
-- 首次同步建议在 WiFi 和充电状态下进行
-- 大量照片（>1000 张）可能需要数小时，请耐心等待
-- 应用会根据可用内存自动调整并发数，无需手动配置
-- 定期清理失败的同步记录（可在设置中重置上传历史）
+### Performance Tips ⚡
+- For the first sync, run it on Wi‑Fi while charging.
+- A large number of photos (>1000) may take several hours; please be patient.
+- The app automatically adjusts concurrency based on available memory; no manual tuning is required.
+- Periodically clear failed sync records (you can reset upload history in settings).
 
-### 支持的媒体格式
-- **图片**：JPG, JPEG, PNG, GIF, WEBP, HEIC, HEIF
-- **视频**：MP4, MKV, AVI, MOV, 3GP
-- 可在设置中自定义监控的文件后缀
+### Supported Media Formats 🖼️🎬
+- **Images**: JPG, JPEG, PNG, GIF, WEBP, HEIC, HEIF.
+- **Videos**: MP4, MKV, AVI, MOV, 3GP.
+- You can customize monitored file extensions in settings.
 
-## 开发与贡献
+## Development & Contributions 🤝
 
-### 构建要求
-- Android Studio Hedgehog (2023.1.1) 或更高
-- JDK 11 或更高
-- Android SDK 36（compileSdk）
-- 最低支持 Android 12 (API 31)
-- Target SDK 33
+### Build Requirements 🛠️
+- Android Studio Hedgehog (2023.1.1) or higher.
+- JDK 11 or higher.
+- Android SDK 36 (`compileSdk`).
+- Minimum supported Android 12 (API 31).
+- Target SDK 33.
 
-### 技术债务（未来改进）
-- [ ] 支持更多云存储协议（S3、自定义 API）
-- [x] 添加端到端加密的照片查看器
-- [ ] 实现 Argon2id 密钥派生（性能优化，替代 PBKDF2）
-- [ ] I18N
+### Technical Debt / Future Work 📌
+- [ ] Support more cloud storage protocols (S3, custom APIs).
+- [x] Add end-to-end-encrypted photo viewer.
+- [ ] Implement Argon2id key derivation (performance improvement, replacement for PBKDF2).
+- [x] I18N.
 
-## 许可证
+## License 📜
 GNU GENERAL PUBLIC LICENSE VERSION 3
 
-## 免责声明
+## Disclaimer ⚠️
 
-本应用处于技术验证阶段，仅用于演示零知识加密的照片备份方案。生产环境使用前需要：
-1. 完整的安全审计
-2. 更完善的错误处理
-3. 数据库迁移策略
-4. 完整的单元测试和集成测试
-5. 性能优化和压力测试
+This app is in a **proof-of-concept** stage and is intended to demonstrate a zero-knowledge encrypted photo backup solution. Before production use, you need:
+1. A complete security audit.
+2. More robust error handling.
+3. A database migration strategy.
+4. Comprehensive unit and integration tests.
+5. Performance optimization and stress testing.
 
-请勿将重要数据完全依赖于本应用，建议保留本地备份。
-
+Do **not** rely solely on this app for critical data. Always keep local backups. 💾
