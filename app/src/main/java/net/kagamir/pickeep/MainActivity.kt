@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.compose.rememberNavController
 import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.data.repository.SettingsRepository
@@ -158,21 +159,21 @@ class MainActivity : ComponentActivity() {
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
-                    text = "需要权限",
+                    text = stringResource(R.string.title_permission_required),
                     style = MaterialTheme.typography.headlineMedium
                 )
                 
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "PicKeep 需要访问您的照片和视频以进行备份。",
+                    text = stringResource(R.string.msg_permission_storage_explain),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "所有数据都将进行端到端加密，服务器无法读取您的照片内容。",
+                    text = stringResource(R.string.msg_permission_encrypted_note),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -184,7 +185,7 @@ class MainActivity : ComponentActivity() {
                         onClick = onRequestReadPermissions,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text("授予读取权限")
+                        Text(text = stringResource(R.string.btn_grant_read_permission))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -194,7 +195,7 @@ class MainActivity : ComponentActivity() {
                         onClick = onRequestWritePermissions,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                        Text("授予写入权限")
+                        Text(text = stringResource(R.string.btn_grant_write_permission))
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
@@ -205,7 +206,7 @@ class MainActivity : ComponentActivity() {
                     onClick = onOpenSettings,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("在设置中授予")
+                    Text(text = stringResource(R.string.btn_open_settings))
                 }
             }
         }

@@ -1,46 +1,159 @@
 <resources>
-    <string name="app_name">PicKeep</string>
-    <string name="action_settings">Settings</string>
-    <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
+    <string name="app_name" translatable="false">PicKeep</string>
 
-    <string name="lorem_ipsum">
-        Lorem ipsum dolor sit amet, consectetur adipiscing elit. Nam in scelerisque sem. Mauris
-        volutpat, dolor id interdum ullamcorper, risus dolor egestas lectus, sit amet mattis purus
-        dui nec risus. Maecenas non sodales nisi, vel dictum dolor. Class aptent taciti sociosqu ad
-        litora torquent per conubia nostra, per inceptos himenaeos. Suspendisse blandit eleifend
-        diam, vel rutrum tellus vulputate quis. Aliquam eget libero aliquet, imperdiet nisl a,
-        ornare ex. Sed rhoncus est ut libero porta lobortis. Fusce in dictum tellus.\n\n
-        Suspendisse interdum ornare ante. Aliquam nec cursus lorem. Morbi id magna felis. Vivamus
-        egestas, est a condimentum egestas, turpis nisl iaculis ipsum, in dictum tellus dolor sed
-        neque. Morbi tellus erat, dapibus ut sem a, iaculis tincidunt dui. Interdum et malesuada
-        fames ac ante ipsum primis in faucibus. Curabitur et eros porttitor, ultricies urna vitae,
-        molestie nibh. Phasellus at commodo eros, non aliquet metus. Sed maximus nisl nec dolor
-        bibendum, vel congue leo egestas.\n\n
-        Sed interdum tortor nibh, in sagittis risus mollis quis. Curabitur mi odio, condimentum sit
-        amet auctor at, mollis non turpis. Nullam pretium libero vestibulum, finibus orci vel,
-        molestie quam. Fusce blandit tincidunt nulla, quis sollicitudin libero facilisis et. Integer
-        interdum nunc ligula, et fermentum metus hendrerit id. Vestibulum lectus felis, dictum at
-        lacinia sit amet, tristique id quam. Cras eu consequat dui. Suspendisse sodales nunc ligula,
-        in lobortis sem porta sed. Integer id ultrices magna, in luctus elit. Sed a pellentesque
-        est.\n\n
-        Aenean nunc velit, lacinia sed dolor sed, ultrices viverra nulla. Etiam a venenatis nibh.
-        Morbi laoreet, tortor sed facilisis varius, nibh orci rhoncus nulla, id elementum leo dui
-        non lorem. Nam mollis ipsum quis auctor varius. Quisque elementum eu libero sed commodo. In
-        eros nisl, imperdiet vel imperdiet et, scelerisque a mauris. Pellentesque varius ex nunc,
-        quis imperdiet eros placerat ac. Duis finibus orci et est auctor tincidunt. Sed non viverra
-        ipsum. Nunc quis augue egestas, cursus lorem at, molestie sem. Morbi a consectetur ipsum, a
-        placerat diam. Etiam vulputate dignissim convallis. Integer faucibus mauris sit amet finibus
-        convallis.\n\n
-        Phasellus in aliquet mi. Pellentesque habitant morbi tristique senectus et netus et
-        malesuada fames ac turpis egestas. In volutpat arcu ut felis sagittis, in finibus massa
-        gravida. Pellentesque id tellus orci. Integer dictum, lorem sed efficitur ullamcorper,
-        libero justo consectetur ipsum, in mollis nisl ex sed nisl. Donec maximus ullamcorper
-        sodales. Praesent bibendum rhoncus tellus nec feugiat. In a ornare nulla. Donec rhoncus
-        libero vel nunc consequat, quis tincidunt nisl eleifend. Cras bibendum enim a justo luctus
-        vestibulum. Fusce dictum libero quis erat maximus, vitae volutpat diam dignissim.
-    </string>
+    <!-- MainActivity permissions -->
+    <string name="title_permission_required">Permission required</string>
+    <string name="msg_permission_storage_explain">PicKeep needs access to your photos and videos to back them up.</string>
+    <string name="msg_permission_encrypted_note">All data is end-to-end encrypted, and the server cannot read your photos.</string>
+    <string name="btn_grant_read_permission">Grant read permission</string>
+    <string name="btn_grant_write_permission">Grant write permission</string>
+    <string name="btn_open_settings">Open in settings</string>
+
+    <!-- SetupScreen -->
+    <string name="title_initial_setup">Initial setup</string>
+    <string name="content_desc_back">Back</string>
+    <string name="title_welcome">Welcome to PicKeep</string>
+    <string name="subtitle_zero_knowledge">Zero-knowledge encrypted photo backup</string>
+    <string name="btn_create_account">Create new account</string>
+    <string name="btn_recover_with_mnemonic">Restore with mnemonic</string>
+    <string name="btn_recover_with_qr">Restore with QR code</string>
+    <string name="title_backup_mnemonic">Backup mnemonic</string>
+    <string name="msg_backup_mnemonic">Please write down the following 12 words in order. If you lose your password or device, this is the only way to restore your data.</string>
+    <string name="btn_mnemonic_backed_up">I have backed it up</string>
+    <string name="title_set_master_password">Set master password</string>
+    <string name="label_password">Password</string>
+    <string name="label_confirm_password">Confirm password</string>
+    <string name="error_password_mismatch">Passwords do not match</string>
+    <string name="error_password_empty">Password cannot be empty</string>
+    <string name="error_initialize_failed">Initialization failed</string>
+    <string name="btn_finish_setup">Finish setup</string>
+    <string name="title_recover_account">Recover account</string>
+    <string name="label_input_mnemonic">Enter mnemonic (separated by spaces)</string>
+    <string name="error_invalid_mnemonic_length">Invalid mnemonic length (current: %1$d, expected 12/15/18/21/24)</string>
+    <string name="btn_next">Next</string>
+    <string name="title_set_new_password">Set new password</string>
+    <string name="error_recover_failed_check_mnemonic">Recovery failed, please check that the mnemonic is correct</string>
+    <string name="title_scan_recover_qr">Scan recovery QR code</string>
+    <string name="msg_scan_recover_qr">Scan the recovery QR code displayed on another device</string>
+    <string name="btn_scan_qr">Scan QR code</string>
+    <string name="title_or_input_mnemonic">Or enter mnemonic manually</string>
+    <string name="error_mnemonic_or_qr_required">Please enter the mnemonic or scan a QR code</string>
+    <string name="hint_qr_align">Align the QR code within the frame</string>
+    <string name="error_invalid_qr_format">Invalid QR code format, please make sure you\'re scanning the correct recovery QR code</string>
+    <string name="error_camera_permission_required">Camera permission is required to scan QR codes</string>
+
+    <!-- SettingsScreen -->
+    <string name="title_settings">Settings</string>
+    <string name="title_webdav_config">WebDAV configuration</string>
+    <string name="label_webdav_server">Server address</string>
+    <string name="label_webdav_username">Username</string>
+    <string name="label_webdav_password">Password</string>
+    <string name="btn_test_connection">Test connection</string>
+    <string name="msg_connection_success">Connection successful</string>
+    <string name="msg_connection_failed">Connection failed: %1$s</string>
+    <string name="msg_connection_failed_exception">Connection failed: %1$s</string>
+    <string name="btn_save">Save</string>
+    <string name="msg_webdav_saved">WebDAV configuration saved</string>
+    <string name="msg_save_failed">Save failed: %1$s</string>
+
+    <string name="title_sync_settings">Sync settings</string>
+    <string name="switch_auto_sync">Auto sync</string>
+    <string name="text_sync_interval_hours">Sync interval: %1$d hours</string>
+    <string name="switch_sync_wifi_only">Sync on Wi-Fi only</string>
+    <string name="switch_sync_charging_only">Sync only while charging</string>
+
+    <string name="title_monitored_file_types">Monitored file types</string>
+    <string name="msg_monitored_file_types_desc">Configure file extensions to monitor (without dot)</string>
+    <string name="content_desc_delete">Delete</string>
+    <string name="label_file_extension">File extension</string>
+    <string name="placeholder_example_jpg">e.g. jpg</string>
+    <string name="btn_add">Add</string>
+    <string name="btn_restore_default">Restore default</string>
+
+    <string name="title_account_recovery">Account recovery</string>
+    <string name="msg_unlock_app_first">Please unlock the app first</string>
+    <string name="msg_generate_qr_failed">Failed to generate QR code: %1$s</string>
+    <string name="btn_show_recovery_qr">Show recovery QR</string>
+    <string name="title_recovery_qr">Recovery QR code</string>
+    <string name="msg_recovery_qr_hint">Scan this QR code from another device to recover your account. Keep it safe and do not share it with others.</string>
+    <string name="msg_recovery_qr_desc">Scan this QR code from another device to quickly restore your account. Keep it safe and do not share it with others.</string>
+
+    <string name="title_advanced_settings">Advanced settings</string>
+    <string name="title_reset_upload_records">Reset upload records</string>
+    <string name="msg_reset_upload_records_confirm">Are you sure you want to clear all local upload records? This will not delete files on the server, but all photos will be rescanned during the next sync, and files with the same name on the server may be overwritten.</string>
+    <string name="msg_upload_records_reset">Upload records have been reset</string>
+    <string name="btn_ok">OK</string>
+    <string name="btn_cancel">Cancel</string>
+
+    <!-- BrowseScreen -->
+    <string name="msg_storage_permission_required_for_download">Storage permission is required to download files</string>
+    <string name="msg_unknown_file">Unknown file</string>
+    <string name="msg_config_load_failed">Failed to load config: %1$s</string>
+    <string name="msg_download_success">Download succeeded: %1$s</string>
+    <string name="msg_download_failed">Download failed</string>
+    <string name="msg_download_failed_with_reason">Download failed: %1$s</string>
+    <string name="msg_webdav_config_required">Please configure the WebDAV server first</string>
+    <string name="msg_remote_path_empty">Remote path is empty</string>
+    <string name="msg_cannot_request_permission_restart">Unable to request permission, please restart the app</string>
+    <string name="msg_unlock_app_required_full">Please unlock the app to browse and download files</string>
+    <string name="msg_no_uploaded_files">No uploaded files yet</string>
+    <string name="msg_loading">Loading…</string>
+    <string name="title_uploaded_files">Uploaded files</string>
+    <string name="btn_refresh">Refresh</string>
+    <string name="msg_get_file_info_failed">Failed to get file info</string>
+    <string name="msg_get_file_info_failed_with_reason">Failed to get file info: %1$s</string>
+    <string name="msg_preview_image_only">Only image files can be previewed</string>
+    <string name="msg_preview_failed">Preview failed</string>
+    <string name="msg_preview_failed_with_reason">Preview failed: %1$s</string>
+    <string name="msg_error_with_reason">Error: %1$s</string>
+    <string name="step_downloading_file">Downloading file</string>
+    <string name="step_downloading_metadata">Downloading metadata</string>
+    <string name="step_decrypting_metadata">Decrypting metadata</string>
+    <string name="step_getting_cek">Getting key</string>
+    <string name="step_decrypting_file">Decrypting file</string>
+    <string name="step_saving_file">Saving file</string>
+    <string name="content_desc_downloaded">Downloaded</string>
+    <string name="content_desc_download">Download</string>
+    <string name="text_uploaded_at">Uploaded at: %1$s</string>
+    <string name="content_desc_close">Close</string>
+    <string name="content_desc_preview_image">Preview image</string>
+    <string name="msg_cannot_load_image">Unable to load image</string>
+    <string name="msg_image_load_failed">Image loading failed</string>
+
+    <!-- UnlockScreen -->
+    <string name="title_unlock">Unlock PicKeep</string>
+    <string name="text_welcome_back">Welcome back</string>
+    <string name="msg_enter_password_to_unlock">Please enter your password to unlock the app</string>
+    <string name="label_unlock_password">Password</string>
+    <string name="error_password_required">Please enter your password</string>
+    <string name="error_password_incorrect">Incorrect password</string>
+    <string name="btn_unlock">Unlock</string>
+
+    <!-- SyncStatusScreen -->
+    <string name="title_sync_status">Sync status</string>
+    <string name="msg_scan_found_new_photos">Found %1$d new photos</string>
+    <string name="msg_scan_no_new_photos">No new photos found</string>
+    <string name="msg_scan_failed">Scan failed: %1$s</string>
+    <string name="content_desc_rescan">Rescan</string>
+    <string name="msg_cancel_current_sync_first">Please cancel the current sync task first</string>
+    <string name="content_desc_settings">Settings</string>
+    <string name="content_desc_sync">Sync</string>
+    <string name="label_pending">Pending</string>
+    <string name="label_uploading">Uploading</string>
+    <string name="label_synced">Synced</string>
+    <string name="label_failed">Failed</string>
+    <string name="btn_browse_uploaded_files">Browse uploaded files (%1$d)</string>
+    <string name="msg_scanning_photos">Scanning photos…</string>
+    <string name="msg_sync_paused">Sync paused</string>
+    <string name="msg_sync_in_progress">Syncing…</string>
+    <string name="msg_preparing">Preparing…</string>
+    <string name="btn_resume_sync">Resume sync</string>
+    <string name="btn_cancel_sync">Cancel sync</string>
+    <string name="btn_pause_sync">Pause sync</string>
+    <string name="msg_unlock_app_to_enable_sync">Please unlock the app to enable sync</string>
+    <string name="step_hashing">Hashing</string>
+    <string name="step_encrypting">Encrypting file</string>
+    <string name="step_generating_path">Generating path</string>
+    <string name="step_uploading_file">Uploading file</string>
+    <string name="step_uploading_metadata">Uploading metadata</string>
 </resources>

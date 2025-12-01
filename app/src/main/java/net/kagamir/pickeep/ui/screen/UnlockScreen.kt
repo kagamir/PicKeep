@@ -5,8 +5,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import net.kagamir.pickeep.R
 import net.kagamir.pickeep.data.repository.SettingsRepository
 
 /**
@@ -22,11 +25,12 @@ fun UnlockScreen(
     var password by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("解锁 PicKeep") }
+                title = { Text(stringResource(R.string.title_unlock)) }
             )
         }
     ) { paddingValues ->
@@ -39,14 +43,14 @@ fun UnlockScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "欢迎回来",
+                text = stringResource(R.string.text_welcome_back),
                 style = MaterialTheme.typography.headlineMedium
             )
             
             Spacer(modifier = Modifier.height(8.dp))
             
             Text(
-                text = "请输入密码以解锁应用",
+                text = stringResource(R.string.msg_enter_password_to_unlock),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -59,7 +63,7 @@ fun UnlockScreen(
                     password = it
                     errorMessage = null
                 },
-                label = { Text("密码") },
+                label = { Text(stringResource(R.string.label_unlock_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth(),
                 isError = errorMessage != null,
@@ -79,7 +83,7 @@ fun UnlockScreen(
             Button(
                 onClick = {
                     if (password.isEmpty()) {
-                        errorMessage = "请输入密码"
+                        errorMessage = context.getString(R.string.error_password_required)
                         return@Button
                     }
                     
@@ -90,7 +94,7 @@ fun UnlockScreen(
                     if (success) {
                         onUnlockSuccess()
                     } else {
-                        errorMessage = "密码错误"
+                        errorMessage = context.getString(R.string.error_password_incorrect)
                         password = ""
                     }
                 },
@@ -103,7 +107,7 @@ fun UnlockScreen(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("解锁")
+                    Text(stringResource(R.string.btn_unlock))
                 }
             }
         }

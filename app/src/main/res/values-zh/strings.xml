@@ -1,0 +1,159 @@
+<resources>
+    <!-- MainActivity permissions -->
+    <string name="title_permission_required">需要权限</string>
+    <string name="msg_permission_storage_explain">PicKeep 需要访问您的照片和视频以进行备份。</string>
+    <string name="msg_permission_encrypted_note">所有数据都将进行端到端加密，服务器无法读取您的照片内容。</string>
+    <string name="btn_grant_read_permission">授予读取权限</string>
+    <string name="btn_grant_write_permission">授予写入权限</string>
+    <string name="btn_open_settings">在设置中授予</string>
+
+    <!-- SetupScreen -->
+    <string name="title_initial_setup">初始设置</string>
+    <string name="content_desc_back">返回</string>
+    <string name="title_welcome">欢迎使用 PicKeep</string>
+    <string name="subtitle_zero_knowledge">零知识加密的照片备份</string>
+    <string name="btn_create_account">创建新账户</string>
+    <string name="btn_recover_with_mnemonic">使用助记词恢复</string>
+    <string name="btn_recover_with_qr">扫描二维码恢复</string>
+    <string name="title_backup_mnemonic">备份助记词</string>
+    <string name="msg_backup_mnemonic">请按顺序抄写以下 12 个单词。如果丢失密码或设备，这是恢复数据的唯一方式。</string>
+    <string name="btn_mnemonic_backed_up">我已备份</string>
+    <string name="title_set_master_password">设置主密码</string>
+    <string name="label_password">密码</string>
+    <string name="label_confirm_password">确认密码</string>
+    <string name="error_password_mismatch">两次密码输入不一致</string>
+    <string name="error_password_empty">密码不能为空</string>
+    <string name="error_initialize_failed">初始化失败</string>
+    <string name="btn_finish_setup">完成设置</string>
+    <string name="title_recover_account">恢复账户</string>
+    <string name="label_input_mnemonic">输入助记词 (空格分隔)</string>
+    <string name="error_invalid_mnemonic_length">助记词长度无效 (当前: %1$d, 应为 12/15/18/21/24)</string>
+    <string name="btn_next">下一步</string>
+    <string name="title_set_new_password">设置新密码</string>
+    <string name="error_recover_failed_check_mnemonic">恢复失败，请检查助记词是否正确</string>
+    <string name="title_scan_recover_qr">扫描恢复二维码</string>
+    <string name="msg_scan_recover_qr">使用另一台设备上显示的恢复二维码进行扫描</string>
+    <string name="btn_scan_qr">扫描二维码</string>
+    <string name="title_or_input_mnemonic">或手动输入助记词</string>
+    <string name="error_mnemonic_or_qr_required">请输入助记词或扫描二维码</string>
+    <string name="hint_qr_align">将二维码对准扫描框</string>
+    <string name="error_invalid_qr_format">二维码格式无效，请确保扫描的是正确的恢复二维码</string>
+    <string name="error_camera_permission_required">需要相机权限才能扫描二维码</string>
+
+    <!-- SettingsScreen -->
+    <string name="title_settings">设置</string>
+    <string name="title_webdav_config">WebDAV 配置</string>
+    <string name="label_webdav_server">服务器地址</string>
+    <string name="label_webdav_username">用户名</string>
+    <string name="label_webdav_password">密码</string>
+    <string name="btn_test_connection">测试连接</string>
+    <string name="msg_connection_success">连接成功</string>
+    <string name="msg_connection_failed">连接失败: %1$s</string>
+    <string name="msg_connection_failed_exception">连接失败: %1$s</string>
+    <string name="btn_save">保存</string>
+    <string name="msg_webdav_saved">WebDAV 配置已保存</string>
+    <string name="msg_save_failed">保存失败: %1$s</string>
+
+    <string name="title_sync_settings">同步设置</string>
+    <string name="switch_auto_sync">自动同步</string>
+    <string name="text_sync_interval_hours">同步间隔: %1$d 小时</string>
+    <string name="switch_sync_wifi_only">仅在 WiFi 下同步</string>
+    <string name="switch_sync_charging_only">仅在充电时同步</string>
+
+    <string name="title_monitored_file_types">监控的文件类型</string>
+    <string name="msg_monitored_file_types_desc">配置需要监控的文件后缀（不含点号）</string>
+    <string name="content_desc_delete">删除</string>
+    <string name="label_file_extension">文件后缀</string>
+    <string name="placeholder_example_jpg">例如: jpg</string>
+    <string name="btn_add">添加</string>
+    <string name="btn_restore_default">恢复默认</string>
+
+    <string name="title_account_recovery">账户恢复</string>
+    <string name="msg_unlock_app_first">请先解锁应用</string>
+    <string name="msg_generate_qr_failed">生成二维码失败: %1$s</string>
+    <string name="btn_show_recovery_qr">显示恢复二维码</string>
+    <string name="title_recovery_qr">恢复二维码</string>
+    <string name="msg_recovery_qr_hint">请使用另一台设备扫描此二维码以恢复账户。请妥善保管，不要泄露给他人。</string>
+    <string name="msg_recovery_qr_desc">使用另一台设备扫描此二维码可以快速恢复账户。请妥善保管，不要泄露给他人。</string>
+
+    <string name="title_advanced_settings">高级设置</string>
+    <string name="title_reset_upload_records">重置上传记录</string>
+    <string name="msg_reset_upload_records_confirm">确定要清除所有本地上传记录吗？这不会删除服务器上的文件，但会导致下次同步时重新扫描所有照片。如果服务器上已存在同名文件，它们将被覆盖。</string>
+    <string name="msg_upload_records_reset">上传记录已重置</string>
+    <string name="btn_ok">确定</string>
+    <string name="btn_cancel">取消</string>
+
+    <!-- BrowseScreen -->
+    <string name="msg_storage_permission_required_for_download">需要存储权限才能下载文件</string>
+    <string name="msg_unknown_file">未知文件</string>
+    <string name="msg_config_load_failed">获取配置失败: %1$s</string>
+    <string name="msg_download_success">下载成功: %1$s</string>
+    <string name="msg_download_failed">下载失败</string>
+    <string name="msg_download_failed_with_reason">下载失败: %1$s</string>
+    <string name="msg_webdav_config_required">请先配置 WebDAV 服务器</string>
+    <string name="msg_remote_path_empty">远程路径为空</string>
+    <string name="msg_cannot_request_permission_restart">无法请求权限，请重启应用</string>
+    <string name="msg_unlock_app_required_full">请先解锁应用以浏览和下载文件</string>
+    <string name="msg_no_uploaded_files">暂无已上传的文件</string>
+    <string name="msg_loading">加载中...</string>
+    <string name="title_uploaded_files">已上传文件</string>
+    <string name="btn_refresh">刷新</string>
+    <string name="msg_get_file_info_failed">获取文件信息失败</string>
+    <string name="msg_get_file_info_failed_with_reason">获取文件信息失败: %1$s</string>
+    <string name="msg_preview_image_only">仅支持预览图片文件</string>
+    <string name="msg_preview_failed">预览失败</string>
+    <string name="msg_preview_failed_with_reason">预览失败: %1$s</string>
+    <string name="msg_error_with_reason">错误: %1$s</string>
+    <string name="step_downloading_file">下载文件</string>
+    <string name="step_downloading_metadata">下载元数据</string>
+    <string name="step_decrypting_metadata">解密元数据</string>
+    <string name="step_getting_cek">获取密钥</string>
+    <string name="step_decrypting_file">解密文件</string>
+    <string name="step_saving_file">保存文件</string>
+    <string name="content_desc_downloaded">已下载</string>
+    <string name="content_desc_download">下载</string>
+    <string name="text_uploaded_at">上传时间: %1$s</string>
+    <string name="content_desc_close">关闭</string>
+    <string name="content_desc_preview_image">预览图片</string>
+    <string name="msg_cannot_load_image">无法加载图片</string>
+    <string name="msg_image_load_failed">图片加载失败</string>
+
+    <!-- UnlockScreen -->
+    <string name="title_unlock">解锁 PicKeep</string>
+    <string name="text_welcome_back">欢迎回来</string>
+    <string name="msg_enter_password_to_unlock">请输入密码以解锁应用</string>
+    <string name="label_unlock_password">密码</string>
+    <string name="error_password_required">请输入密码</string>
+    <string name="error_password_incorrect">密码错误</string>
+    <string name="btn_unlock">解锁</string>
+
+    <!-- SyncStatusScreen -->
+    <string name="title_sync_status">同步状态</string>
+    <string name="msg_scan_found_new_photos">发现 %1$d 个新照片</string>
+    <string name="msg_scan_no_new_photos">没有发现新照片</string>
+    <string name="msg_scan_failed">扫描失败: %1$s</string>
+    <string name="content_desc_rescan">重新扫描</string>
+    <string name="msg_cancel_current_sync_first">请先取消当前同步任务</string>
+    <string name="content_desc_settings">设置</string>
+    <string name="content_desc_sync">同步</string>
+    <string name="label_pending">待同步</string>
+    <string name="label_uploading">正在上传</string>
+    <string name="label_synced">已同步</string>
+    <string name="label_failed">失败</string>
+    <string name="btn_browse_uploaded_files">浏览已上传文件 (%1$d)</string>
+    <string name="msg_scanning_photos">正在扫描照片...</string>
+    <string name="msg_sync_paused">同步已暂停</string>
+    <string name="msg_sync_in_progress">正在同步...</string>
+    <string name="msg_preparing">准备中...</string>
+    <string name="btn_resume_sync">继续同步</string>
+    <string name="btn_cancel_sync">取消同步</string>
+    <string name="btn_pause_sync">暂停同步</string>
+    <string name="msg_unlock_app_to_enable_sync">请先解锁应用以启用同步功能</string>
+    <string name="step_hashing">计算哈希</string>
+    <string name="step_encrypting">加密文件</string>
+    <string name="step_generating_path">生成路径</string>
+    <string name="step_uploading_file">上传文件</string>
+    <string name="step_uploading_metadata">上传元数据</string>
+</resources>
+
+

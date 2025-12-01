@@ -12,9 +12,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
+import net.kagamir.pickeep.R
 import net.kagamir.pickeep.data.repository.SettingsRepository
 import net.kagamir.pickeep.storage.webdav.WebDavClient
 import net.kagamir.pickeep.util.QrCodeHelper
@@ -47,6 +50,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
     val isUnlocked = settingsRepository.isUnlocked()
+    val context = LocalContext.current
     
     // 加载现有设置
     LaunchedEffect(Unit) {
@@ -70,24 +74,26 @@ fun SettingsScreen(
     if (showResetDialog) {
         AlertDialog(
             onDismissRequest = { showResetDialog = false },
-            title = { Text("重置上传记录") },
-            text = { Text("确定要清除所有本地上传记录吗？这不会删除服务器上的文件，但会导致下次同步时重新扫描所有照片。如果服务器上已存在同名文件，它们将被覆盖。") },
+            title = { Text(stringResource(R.string.title_reset_upload_records)) },
+            text = { Text(stringResource(R.string.msg_reset_upload_records_confirm)) },
             confirmButton = {
                 TextButton(
                     onClick = {
                         scope.launch {
                             settingsRepository.resetUploadHistory()
                             showResetDialog = false
-                            snackbarHostState.showSnackbar("上传记录已重置")
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(R.string.msg_upload_records_reset)
+                            )
                         }
                     }
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.btn_ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
-                    Text("取消")
+                    Text(stringResource(R.string.btn_cancel))
                 }
             }
         )
@@ -96,7 +102,7 @@ fun SettingsScreen(
     if (showQrCodeDialog) {
         AlertDialog(
             onDismissRequest = { showQrCodeDialog = false },
-            title = { Text("恢复二维码") },
+            title = { Text(stringResource(R.string.title_recovery_qr)) },
             text = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -104,13 +110,13 @@ fun SettingsScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
-                        text = "请使用另一台设备扫描此二维码以恢复账户。请妥善保管，不要泄露给他人。",
+                        text = stringResource(R.string.msg_recovery_qr_hint),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     if (qrCodeBitmap != null) {
                         Image(
                             bitmap = qrCodeBitmap!!,
-                            contentDescription = "恢复二维码",
+                            contentDescription = stringResource(R.string.title_recovery_qr),
                             modifier = Modifier
                                 .size(300.dp)
                                 .padding(16.dp)
@@ -122,7 +128,7 @@ fun SettingsScreen(
             },
             confirmButton = {
                 TextButton(onClick = { showQrCodeDialog = false }) {
-                    Text("关闭")
+                    Text(stringResource(R.string.btn_ok))
                 }
             }
         )
@@ -131,10 +137,13 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("设置") },
+                title = { Text(stringResource(R.string.title_settings)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.content_desc_back)
+                        )
                     }
                 }
             )
@@ -151,14 +160,14 @@ fun SettingsScreen(
         ) {
             // WebDAV 配置
             Text(
-                text = "WebDAV 配置",
+                text = stringResource(R.string.title_webdav_config),
                 style = MaterialTheme.typography.titleMedium
             )
             
             OutlinedTextField(
                 value = webdavUrl,
                 onValueChange = { webdavUrl = it },
-                label = { Text("服务器地址") },
+                label = { Text(stringResource(R.string.label_webdav_server)) },
                 placeholder = { Text("https://example.com/webdav") },
                 modifier = Modifier.fillMaxWidth()
             )
@@ -166,14 +175,14 @@ fun SettingsScreen(
             OutlinedTextField(
                 value = webdavUsername,
                 onValueChange = { webdavUsername = it },
-                label = { Text("用户名") },
+                label = { Text(stringResource(R.string.label_webdav_username)) },
                 modifier = Modifier.fillMaxWidth()
             )
             
             OutlinedTextField(
                 value = webdavPassword,
                 onValueChange = { webdavPassword = it },
-                label = { Text("密码") },
+                label = { Text(stringResource(R.string.label_webdav_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -187,18 +196,25 @@ fun SettingsScreen(
                         scope.launch {
                             isTestingConnection = true
                             testResult = null
-                            
+
                             try {
                                 val client = WebDavClient(webdavUrl, webdavUsername, webdavPassword)
                                 val result = client.checkConnection()
-                                
-                                testResult = if (result.isSuccess && result.getOrNull() == true) {
-                                    "连接成功"
-                                } else {
-                                    "连接失败: ${result.exceptionOrNull()?.message}"
-                                }
+
+                                testResult =
+                                    if (result.isSuccess && result.getOrNull() == true) {
+                                        context.getString(R.string.msg_connection_success)
+                                    } else {
+                                        context.getString(
+                                            R.string.msg_connection_failed,
+                                            result.exceptionOrNull()?.message ?: ""
+                                        )
+                                    }
                             } catch (e: Exception) {
-                                testResult = "连接失败: ${e.message}"
+                                testResult = context.getString(
+                                    R.string.msg_connection_failed_exception,
+                                    e.message ?: ""
+                                )
                             } finally {
                                 isTestingConnection = false
                             }
@@ -213,10 +229,10 @@ fun SettingsScreen(
                             color = MaterialTheme.colorScheme.onPrimary
                         )
                     } else {
-                        Text("测试连接")
+                        Text(stringResource(R.string.btn_test_connection))
                     }
                 }
-                
+
                 Button(
                     onClick = {
                         scope.launch {
@@ -228,15 +244,21 @@ fun SettingsScreen(
                                         password = webdavPassword
                                     )
                                 )
-                                saveResult = "WebDAV 配置已保存"
+                                saveResult = context.getString(R.string.msg_webdav_saved)
                                 snackbarHostState.showSnackbar(
-                                    message = "WebDAV 配置已保存",
+                                    message = context.getString(R.string.msg_webdav_saved),
                                     duration = SnackbarDuration.Short
                                 )
                             } catch (e: Exception) {
-                                saveResult = "保存失败: ${e.message}"
+                                saveResult = context.getString(
+                                    R.string.msg_save_failed,
+                                    e.message ?: ""
+                                )
                                 snackbarHostState.showSnackbar(
-                                    message = "保存失败: ${e.message}",
+                                    message = context.getString(
+                                        R.string.msg_save_failed,
+                                        e.message ?: ""
+                                    ),
                                     duration = SnackbarDuration.Short
                                 )
                             }
@@ -245,26 +267,26 @@ fun SettingsScreen(
                     enabled = webdavUrl.isNotBlank() && webdavUsername.isNotBlank(),
                     modifier = Modifier.weight(1f)
                 ) {
-                    Text("保存")
+                    Text(stringResource(R.string.btn_save))
                 }
             }
-            
+
             if (testResult != null) {
                 Text(
                     text = testResult!!,
                     style = MaterialTheme.typography.bodySmall,
-                    color = if (testResult!!.startsWith("连接成功"))
+                    color = if (testResult == stringResource(R.string.msg_connection_success))
                         MaterialTheme.colorScheme.primary
                     else
                         MaterialTheme.colorScheme.error
                 )
             }
-            
+
             HorizontalDivider()
-            
+
             // 同步设置
             Text(
-                text = "同步设置",
+                text = stringResource(R.string.title_sync_settings),
                 style = MaterialTheme.typography.titleMedium
             )
             
@@ -272,7 +294,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("自动同步")
+                Text(stringResource(R.string.switch_auto_sync))
                 Switch(
                     checked = autoSync,
                     onCheckedChange = {
@@ -292,7 +314,10 @@ fun SettingsScreen(
             
             if (autoSync) {
                 Text(
-                    text = "同步间隔: ${syncInterval} 小时",
+                    text = stringResource(
+                        R.string.text_sync_interval_hours,
+                        syncInterval
+                    ),
                     style = MaterialTheme.typography.bodyMedium
                 )
                 
@@ -319,7 +344,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("仅在 WiFi 下同步")
+                Text(stringResource(R.string.switch_sync_wifi_only))
                 Switch(
                     checked = syncOnlyOnWifi,
                     onCheckedChange = {
@@ -341,7 +366,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("仅在充电时同步")
+                Text(stringResource(R.string.switch_sync_charging_only))
                 Switch(
                     checked = syncOnlyWhenCharging,
                     onCheckedChange = {
@@ -363,12 +388,12 @@ fun SettingsScreen(
             
             // 监控的文件类型
             Text(
-                text = "监控的文件类型",
+                text = stringResource(R.string.title_monitored_file_types),
                 style = MaterialTheme.typography.titleMedium
             )
-            
+
             Text(
-                text = "配置需要监控的文件后缀（不含点号）",
+                text = stringResource(R.string.msg_monitored_file_types_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -412,7 +437,7 @@ fun SettingsScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.Close,
-                                        contentDescription = "删除",
+                                        contentDescription = stringResource(R.string.content_desc_delete),
                                         modifier = Modifier.size(16.dp)
                                     )
                                 }
@@ -433,8 +458,8 @@ fun SettingsScreen(
                         // 只允许字母和数字
                         extensionInput = it.filter { char -> char.isLetterOrDigit() }.lowercase()
                     },
-                    label = { Text("文件后缀") },
-                    placeholder = { Text("例如: jpg") },
+                    label = { Text(stringResource(R.string.label_file_extension)) },
+                    placeholder = { Text(stringResource(R.string.placeholder_example_jpg)) },
                     modifier = Modifier.weight(1f),
                     singleLine = true
                 )
@@ -460,7 +485,7 @@ fun SettingsScreen(
                     },
                     enabled = extensionInput.trim().isNotBlank()
                 ) {
-                    Text("添加")
+                    Text(stringResource(R.string.btn_add))
                 }
             }
             
@@ -481,14 +506,14 @@ fun SettingsScreen(
                 },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("恢复默认")
+                Text(stringResource(R.string.btn_restore_default))
             }
             
             HorizontalDivider()
             
             // 账户恢复
             Text(
-                text = "账户恢复",
+                text = stringResource(R.string.title_account_recovery),
                 style = MaterialTheme.typography.titleMedium
             )
             
@@ -496,7 +521,9 @@ fun SettingsScreen(
                 onClick = {
                     if (!isUnlocked) {
                         scope.launch {
-                            snackbarHostState.showSnackbar("请先解锁应用")
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(R.string.msg_unlock_app_first)
+                            )
                         }
                         return@Button
                     }
@@ -506,18 +533,23 @@ fun SettingsScreen(
                         showQrCodeDialog = true
                     } catch (e: Exception) {
                         scope.launch {
-                            snackbarHostState.showSnackbar("生成二维码失败: ${e.message}")
+                            snackbarHostState.showSnackbar(
+                                message = context.getString(
+                                    R.string.msg_generate_qr_failed,
+                                    e.message ?: ""
+                                )
+                            )
                         }
                     }
                 },
                 modifier = Modifier.fillMaxWidth(),
                 enabled = isUnlocked
             ) {
-                Text("显示恢复二维码")
+                Text(stringResource(R.string.btn_show_recovery_qr))
             }
-            
+
             Text(
-                text = "使用另一台设备扫描此二维码可以快速恢复账户。请妥善保管，不要泄露给他人。",
+                text = stringResource(R.string.msg_recovery_qr_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -526,16 +558,16 @@ fun SettingsScreen(
             
             // 高级设置
             Text(
-                text = "高级设置",
+                text = stringResource(R.string.title_advanced_settings),
                 style = MaterialTheme.typography.titleMedium
             )
-            
+
             Button(
                 onClick = { showResetDialog = true },
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("重置上传记录")
+                Text(stringResource(R.string.title_reset_upload_records))
             }
         }
     }

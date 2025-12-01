@@ -47,12 +47,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import net.kagamir.pickeep.R
 import net.kagamir.pickeep.crypto.MasterKeyStore
 import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.data.local.entity.PhotoEntity
@@ -94,7 +96,9 @@ fun BrowseScreen(
             // 这里不需要做什么，因为下载会在权限检查后自动继续
         } else {
             scope.launch {
-                snackbarHostState.showSnackbar("需要存储权限才能下载文件")
+                snackbarHostState.showSnackbar(
+                    message = context.getString(R.string.msg_storage_permission_required_for_download)
+                )
             }
         }
     }
@@ -178,11 +182,13 @@ fun BrowseScreen(
                     } else {
                         // 加载失败，使用哈希文件名
                         fileNames[photo.id] =
-                            photo.remotePath?.substringAfterLast('/') ?: "未知文件"
+                            photo.remotePath?.substringAfterLast('/')
+                                ?: context.getString(R.string.msg_unknown_file)
                     }
                 } catch (e: Exception) {
                     android.util.Log.e("BrowseScreen", "加载元数据失败: ${photo.id}", e)
-                    fileNames[photo.id] = photo.remotePath?.substringAfterLast('/') ?: "未知文件"
+                    fileNames[photo.id] = photo.remotePath?.substringAfterLast('/')
+                        ?: context.getString(R.string.msg_unknown_file)
                 } finally {
                     metadataCache.clearLoading(photo.id)
                 }
@@ -223,7 +229,12 @@ fun BrowseScreen(
         val webdavSettings = try {
             settingsRepository.webdavSettings.first()
         } catch (e: Exception) {
-            snackbarHostState.showSnackbar("获取配置失败: ${e.message}")
+            snackbarHostState.showSnackbar(
+                message = context.getString(
+                    R.string.msg_config_load_failed,
+                    e.message ?: ""
+                )
+            )
             null
         }
 
@@ -288,18 +299,22 @@ fun BrowseScreen(
                     )
                     // 使用解析出的文件名，如果没有则使用哈希文件名
                     val displayFileName =
-                        fileNames[photo.id] ?: photo.remotePath?.substringAfterLast('/') ?: "文件"
+                        fileNames[photo.id] ?: photo.remotePath?.substringAfterLast('/')
+                        ?: context.getString(R.string.msg_unknown_file)
                     snackbarHostState.showSnackbar(
-                        "下载成功: $displayFileName"
+                        context.getString(R.string.msg_download_success, displayFileName)
                     )
                 } else {
-                    val error = result.exceptionOrNull()?.message ?: "下载失败"
+                    val error = result.exceptionOrNull()?.message
+                        ?: context.getString(R.string.msg_download_failed)
                     downloadStates[photo.id] = DownloadState(
                         isDownloading = false,
                         isSuccess = false,
                         errorMessage = error
                     )
-                    snackbarHostState.showSnackbar("下载失败: $error")
+                    snackbarHostState.showSnackbar(
+                        context.getString(R.string.msg_download_failed_with_reason, error)
+                    )
                 }
             } catch (e: Exception) {
                 android.util.Log.e("BrowseScreen", "下载失败", e)
@@ -308,10 +323,17 @@ fun BrowseScreen(
                     isSuccess = false,
                     errorMessage = e.message
                 )
-                snackbarHostState.showSnackbar("下载失败: ${e.message}")
+                snackbarHostState.showSnackbar(
+                    context.getString(
+                        R.string.msg_download_failed_with_reason,
+                        e.message ?: ""
+                    )
+                )
             }
         } else {
-            snackbarHostState.showSnackbar("请先配置 WebDAV 服务器")
+            snackbarHostState.showSnackbar(
+                context.getString(R.string.msg_webdav_config_required)
+            )
         }
     }
 
@@ -319,7 +341,9 @@ fun BrowseScreen(
     fun downloadPhoto(photo: PhotoEntity) {
         if (!isUnlocked) {
             scope.launch {
-                snackbarHostState.showSnackbar("请先解锁应用")
+                snackbarHostState.showSnackbar(
+                    context.getString(R.string.msg_unlock_app_first)
+                )
             }
             return
         }
@@ -327,14 +351,18 @@ fun BrowseScreen(
         val webdavSettings = settingsRepository.webdavSettings.value
         if (!webdavSettings.isValid()) {
             scope.launch {
-                snackbarHostState.showSnackbar("请先配置 WebDAV 服务器")
+                snackbarHostState.showSnackbar(
+                    context.getString(R.string.msg_webdav_config_required)
+                )
             }
             return
         }
 
         if (photo.remotePath.isNullOrBlank()) {
             scope.launch {
-                snackbarHostState.showSnackbar("远程路径为空")
+                snackbarHostState.showSnackbar(
+                    context.getString(R.string.msg_remote_path_empty)
+                )
             }
             return
         }
@@ -351,13 +379,17 @@ fun BrowseScreen(
                         }
                     } else {
                         scope.launch {
-                            snackbarHostState.showSnackbar("需要存储权限才能下载文件")
+                            snackbarHostState.showSnackbar(
+                                context.getString(R.string.msg_storage_permission_required_for_download)
+                            )
                         }
                     }
                 }
             } else {
                 scope.launch {
-                    snackbarHostState.showSnackbar("无法请求权限，请重启应用")
+                    snackbarHostState.showSnackbar(
+                        context.getString(R.string.msg_cannot_request_permission_restart)
+                    )
                 }
             }
             return
@@ -394,7 +426,9 @@ fun BrowseScreen(
     fun previewPhoto(photo: PhotoEntity) {
         if (!isUnlocked) {
             scope.launch {
-                snackbarHostState.showSnackbar("请先解锁应用")
+                snackbarHostState.showSnackbar(
+                    context.getString(R.string.msg_unlock_app_first)
+                )
             }
             return
         }
@@ -402,14 +436,18 @@ fun BrowseScreen(
         val webdavSettings = settingsRepository.webdavSettings.value
         if (!webdavSettings.isValid()) {
             scope.launch {
-                snackbarHostState.showSnackbar("请先配置 WebDAV 服务器")
+                snackbarHostState.showSnackbar(
+                    context.getString(R.string.msg_webdav_config_required)
+                )
             }
             return
         }
 
         if (photo.remotePath.isNullOrBlank()) {
             scope.launch {
-                snackbarHostState.showSnackbar("远程路径为空")
+                snackbarHostState.showSnackbar(
+                    context.getString(R.string.msg_remote_path_empty)
+                )
             }
             return
         }
@@ -436,8 +474,14 @@ fun BrowseScreen(
                 // 先下载元数据，判断是否为图片
                 val metadataResult = downloadTask.downloadMetadataOnly(photo)
                 if (metadataResult.isFailure) {
-                    val error = metadataResult.exceptionOrNull()?.message ?: "获取文件信息失败"
-                    snackbarHostState.showSnackbar("获取文件信息失败: $error")
+                    val error = metadataResult.exceptionOrNull()?.message
+                        ?: context.getString(R.string.msg_get_file_info_failed)
+                    snackbarHostState.showSnackbar(
+                        context.getString(
+                            R.string.msg_get_file_info_failed_with_reason,
+                            error
+                        )
+                    )
                     previewPhoto = null
                     isPreviewLoading = false
                     return@launch
@@ -470,7 +514,9 @@ fun BrowseScreen(
                         ))
 
                 if (!isImage) {
-                    snackbarHostState.showSnackbar("仅支持预览图片文件")
+                    snackbarHostState.showSnackbar(
+                        context.getString(R.string.msg_preview_image_only)
+                    )
                     previewPhoto = null
                     previewFileName = null
                     isPreviewLoading = false
@@ -483,14 +529,25 @@ fun BrowseScreen(
                 if (result.isSuccess) {
                     previewImagePath = result.getOrNull()
                 } else {
-                    val error = result.exceptionOrNull()?.message ?: "预览失败"
-                    snackbarHostState.showSnackbar("预览失败: $error")
+                    val error = result.exceptionOrNull()?.message
+                        ?: context.getString(R.string.msg_preview_failed)
+                    snackbarHostState.showSnackbar(
+                        context.getString(
+                            R.string.msg_preview_failed_with_reason,
+                            error
+                        )
+                    )
                     previewPhoto = null
                     previewFileName = null
                 }
             } catch (e: Exception) {
                 android.util.Log.e("BrowseScreen", "预览失败", e)
-                snackbarHostState.showSnackbar("预览失败: ${e.message}")
+                snackbarHostState.showSnackbar(
+                    context.getString(
+                        R.string.msg_preview_failed_with_reason,
+                        e.message ?: ""
+                    )
+                )
                 previewPhoto = null
                 previewFileName = null
             } finally {
@@ -503,10 +560,13 @@ fun BrowseScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("已上传文件") },
+                title = { Text(stringResource(R.string.title_uploaded_files)) },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.content_desc_back)
+                        )
                     }
                 },
                 actions = {
@@ -515,7 +575,10 @@ fun BrowseScreen(
                             // 刷新列表（实际上列表会自动更新，因为使用的是 Flow）
                         }
                     ) {
-                        Icon(Icons.Default.Refresh, "刷新")
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.btn_refresh)
+                        )
                     }
                 }
             )
@@ -535,7 +598,7 @@ fun BrowseScreen(
                     )
                 ) {
                     Text(
-                        text = "请先解锁应用以浏览和下载文件",
+                        text = stringResource(R.string.msg_unlock_app_required_full),
                         modifier = Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -550,7 +613,7 @@ fun BrowseScreen(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "暂无已上传的文件",
+                    text = stringResource(R.string.msg_no_uploaded_files),
                     style = MaterialTheme.typography.bodyLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -568,8 +631,9 @@ fun BrowseScreen(
                     val photo = allPhotos[index]
                     PhotoItem(
                         photo = photo,
-                        fileName = fileNames[photo.id] ?: photo.remotePath?.substringAfterLast('/')
-                        ?: "加载中...",
+                        fileName = fileNames[photo.id]
+                            ?: photo.remotePath?.substringAfterLast('/')
+                            ?: stringResource(R.string.msg_loading),
                         isLoadingMetadata = metadataCache.isLoading(photo.id) && !fileNames.containsKey(
                             photo.id
                         ),
@@ -600,7 +664,8 @@ fun BrowseScreen(
             ImagePreviewDialog(
                 photo = previewPhoto!!,
                 fileName = previewFileName ?: fileNames[previewPhoto!!.id]
-                ?: previewPhoto!!.remotePath?.substringAfterLast('/') ?: "未知文件",
+                ?: previewPhoto!!.remotePath?.substringAfterLast('/')
+                ?: context.getString(R.string.msg_unknown_file),
                 imagePath = previewImagePath,
                 isLoading = isPreviewLoading,
                 onDismiss = {
@@ -692,12 +757,15 @@ private fun PhotoItem(
                 } else if (isSuccess) {
                     Icon(
                         Icons.Default.Download,
-                        "已下载",
+                        contentDescription = stringResource(R.string.content_desc_downloaded),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 } else {
                     IconButton(onClick = onDownloadClick) {
-                        Icon(Icons.Default.Download, "下载")
+                        Icon(
+                            Icons.Default.Download,
+                            contentDescription = stringResource(R.string.content_desc_download)
+                        )
                     }
                 }
             }
@@ -705,7 +773,10 @@ private fun PhotoItem(
             // 时间戳
             if (photo.lastSyncedAt != null) {
                 Text(
-                    text = "上传时间: ${formatTimestamp(photo.lastSyncedAt)}",
+                    text = stringResource(
+                        R.string.text_uploaded_at,
+                        formatTimestamp(photo.lastSyncedAt)
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -741,7 +812,10 @@ private fun PhotoItem(
             // 错误信息
             if (downloadState?.errorMessage != null) {
                 Text(
-                    text = "错误: ${downloadState.errorMessage}",
+                    text = stringResource(
+                        R.string.msg_error_with_reason,
+                        downloadState.errorMessage ?: ""
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
@@ -781,14 +855,15 @@ private fun formatTimestamp(timestamp: Long): String {
 /**
  * 获取步骤文本
  */
+@Composable
 private fun getStepText(step: DownloadStep?): String {
     return when (step) {
-        DownloadStep.DOWNLOADING_FILE -> "下载文件"
-        DownloadStep.DOWNLOADING_METADATA -> "下载元数据"
-        DownloadStep.DECRYPTING_METADATA -> "解密元数据"
-        DownloadStep.GETTING_CEK -> "获取密钥"
-        DownloadStep.DECRYPTING_FILE -> "解密文件"
-        DownloadStep.SAVING_FILE -> "保存文件"
+        DownloadStep.DOWNLOADING_FILE -> stringResource(R.string.step_downloading_file)
+        DownloadStep.DOWNLOADING_METADATA -> stringResource(R.string.step_downloading_metadata)
+        DownloadStep.DECRYPTING_METADATA -> stringResource(R.string.step_decrypting_metadata)
+        DownloadStep.GETTING_CEK -> stringResource(R.string.step_getting_cek)
+        DownloadStep.DECRYPTING_FILE -> stringResource(R.string.step_decrypting_file)
+        DownloadStep.SAVING_FILE -> stringResource(R.string.step_saving_file)
         null -> ""
         else -> ""
     }
@@ -828,7 +903,7 @@ private fun ImagePreviewDialog(
                 ) {
                     Icon(
                         Icons.Default.Close,
-                        "关闭",
+                        contentDescription = stringResource(R.string.content_desc_close),
                         tint = MaterialTheme.colorScheme.onSurface
                     )
                 }
@@ -866,20 +941,20 @@ private fun ImagePreviewDialog(
                         if (bitmap != null) {
                             Image(
                                 bitmap = bitmap.asImageBitmap(),
-                                contentDescription = "预览图片",
+                                contentDescription = stringResource(R.string.content_desc_preview_image),
                                 modifier = Modifier.fillMaxSize(),
                                 contentScale = ContentScale.Fit
                             )
                         } else {
                             Text(
-                                text = "无法加载图片",
+                                text = stringResource(R.string.msg_cannot_load_image),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.error
                             )
                         }
                     } else {
                         Text(
-                            text = "图片加载失败",
+                            text = stringResource(R.string.msg_image_load_failed),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.error
                         )

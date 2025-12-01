@@ -12,9 +12,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import net.kagamir.pickeep.R
 import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.data.local.entity.SyncStatus
 import net.kagamir.pickeep.data.repository.SettingsRepository
@@ -94,11 +96,20 @@ fun SyncStatusScreen(
                 val newCount = photoScanner.scanForChanges()
                 android.util.Log.d("SyncStatusScreen", "扫描完成，发现 $newCount 个新照片")
                 snackbarHostState.showSnackbar(
-                    if (newCount > 0) "发现 $newCount 个新照片" else "没有发现新照片"
+                    if (newCount > 0) {
+                        context.getString(R.string.msg_scan_found_new_photos, newCount)
+                    } else {
+                        context.getString(R.string.msg_scan_no_new_photos)
+                    }
                 )
             } catch (e: Exception) {
                 android.util.Log.e("SyncStatusScreen", "扫描照片失败", e)
-                snackbarHostState.showSnackbar("扫描失败: ${e.message}")
+                snackbarHostState.showSnackbar(
+                    context.getString(
+                        R.string.msg_scan_failed,
+                        e.message ?: ""
+                    )
+                )
             } finally {
                 isScanning = false
             }
@@ -109,20 +120,25 @@ fun SyncStatusScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text("PicKeep") },
+                title = { Text(stringResource(R.string.app_name)) },
                 actions = {
                     IconButton(
                         onClick = { performScan() },
                         enabled = !isScanning && !syncStateValue.isSyncing
                     ) {
-                        Icon(Icons.Default.Refresh, "重新扫描")
+                        Icon(
+                            Icons.Default.Refresh,
+                            contentDescription = stringResource(R.string.content_desc_rescan)
+                        )
                     }
                     IconButton(
                         onClick = {
                             if (syncStateValue.isSyncing) {
                                 // 正在同步时，显示提示
                                 scope.launch {
-                                    snackbarHostState.showSnackbar("请先取消当前同步任务")
+                                    snackbarHostState.showSnackbar(
+                                        context.getString(R.string.msg_cancel_current_sync_first)
+                                    )
                                 }
                             } else {
                                 // 正常导航到设置页面
@@ -131,7 +147,10 @@ fun SyncStatusScreen(
                         },
                         enabled = !syncStateValue.isSyncing
                     ) {
-                        Icon(Icons.Default.Settings, "设置")
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.content_desc_settings)
+                        )
                     }
                 }
             )
@@ -160,7 +179,10 @@ fun SyncStatusScreen(
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Sync, "同步")
+                    Icon(
+                        Icons.Default.Sync,
+                        contentDescription = stringResource(R.string.content_desc_sync)
+                    )
                 }
             }
         }
@@ -174,7 +196,7 @@ fun SyncStatusScreen(
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Text(
-                text = "同步状态",
+                text = stringResource(R.string.title_sync_status),
                 style = MaterialTheme.typography.headlineMedium
             )
             
@@ -188,11 +210,11 @@ fun SyncStatusScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    StatusRow("待同步", pendingCount)
-                    StatusRow("正在上传", uploadingCount)
-                    StatusRow("已同步", syncedCount)
+                    StatusRow(stringResource(R.string.label_pending), pendingCount)
+                    StatusRow(stringResource(R.string.label_uploading), uploadingCount)
+                    StatusRow(stringResource(R.string.label_synced), syncedCount)
                     if (failedCount > 0) {
-                        StatusRow("失败", failedCount, isError = true)
+                        StatusRow(stringResource(R.string.label_failed), failedCount, isError = true)
                     }
                     
                     // 浏览已上传文件按钮
@@ -202,9 +224,21 @@ fun SyncStatusScreen(
                             onClick = onNavigateToBrowse,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Folder, "浏览", modifier = Modifier.size(18.dp))
+                            Icon(
+                                Icons.Default.Folder,
+                                contentDescription = stringResource(
+                                    R.string.btn_browse_uploaded_files,
+                                    syncedCount
+                                ),
+                                modifier = Modifier.size(18.dp)
+                            )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("浏览已上传文件 ($syncedCount)")
+                            Text(
+                                stringResource(
+                                    R.string.btn_browse_uploaded_files,
+                                    syncedCount
+                                )
+                            )
                         }
                     }
                 }
@@ -221,7 +255,7 @@ fun SyncStatusScreen(
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("正在扫描照片...")
+                        Text(stringResource(R.string.msg_scanning_photos))
                         CircularProgressIndicator(modifier = Modifier.size(24.dp))
                     }
                 }
@@ -241,7 +275,11 @@ fun SyncStatusScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (syncStateValue.isPaused) "同步已暂停" else "正在同步...",
+                                text = if (syncStateValue.isPaused) {
+                                    stringResource(R.string.msg_sync_paused)
+                                } else {
+                                    stringResource(R.string.msg_sync_in_progress)
+                                },
                                 style = MaterialTheme.typography.titleMedium
                             )
                             if (!syncStateValue.isPaused) {
@@ -261,7 +299,7 @@ fun SyncStatusScreen(
                             }
                         } else {
                             Text(
-                                text = "准备中...",
+                                text = stringResource(R.string.msg_preparing),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -277,7 +315,7 @@ fun SyncStatusScreen(
                                     onClick = { syncState.resumeSync() },
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("继续同步")
+                                    Text(stringResource(R.string.btn_resume_sync))
                                 }
                                 OutlinedButton(
                                     onClick = { 
@@ -286,14 +324,14 @@ fun SyncStatusScreen(
                                     },
                                     modifier = Modifier.weight(1f)
                                 ) {
-                                    Text("取消同步")
+                                    Text(stringResource(R.string.btn_cancel_sync))
                                 }
                             } else {
                                 OutlinedButton(
                                     onClick = { syncState.pauseSync() },
                                     modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    Text("暂停同步")
+                                    Text(stringResource(R.string.btn_pause_sync))
                                 }
                             }
                         }
@@ -312,7 +350,7 @@ fun SyncStatusScreen(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = "请先解锁应用以启用同步功能",
+                        text = stringResource(R.string.msg_unlock_app_to_enable_sync),
                         modifier = Modifier.padding(16.dp),
                         color = MaterialTheme.colorScheme.onErrorContainer
                     )
@@ -362,13 +400,14 @@ private fun formatFileSize(bytes: Long): String {
 /**
  * 获取步骤文本
  */
+@Composable
 private fun getStepText(step: UploadStep): String {
     return when (step) {
-        UploadStep.HASHING -> "计算哈希"
-        UploadStep.ENCRYPTING -> "加密文件"
-        UploadStep.GENERATING_PATH -> "生成路径"
-        UploadStep.UPLOADING_FILE -> "上传文件"
-        UploadStep.UPLOADING_METADATA -> "上传元数据"
+        UploadStep.HASHING -> stringResource(R.string.step_hashing)
+        UploadStep.ENCRYPTING -> stringResource(R.string.step_encrypting)
+        UploadStep.GENERATING_PATH -> stringResource(R.string.step_generating_path)
+        UploadStep.UPLOADING_FILE -> stringResource(R.string.step_uploading_file)
+        UploadStep.UPLOADING_METADATA -> stringResource(R.string.step_uploading_metadata)
     }
 }
 

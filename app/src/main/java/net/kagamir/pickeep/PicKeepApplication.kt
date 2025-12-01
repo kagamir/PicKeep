@@ -31,7 +31,7 @@ class PicKeepApplication : Application(), Configuration.Provider, Application.Ac
     
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
-            .setMinimumLoggingLevel(android.util.Log.INFO)
+            .setMinimumLoggingLevel(android.util.Log.ERROR)
             .build()
 
     override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}

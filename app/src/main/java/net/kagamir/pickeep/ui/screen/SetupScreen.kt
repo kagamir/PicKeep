@@ -17,11 +17,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
+import net.kagamir.pickeep.R
 import net.kagamir.pickeep.crypto.KeyDerivation
 import net.kagamir.pickeep.data.repository.SettingsRepository
 import net.kagamir.pickeep.util.QrCodeHelper
@@ -40,11 +42,11 @@ fun SetupScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("初始设置") },
+                title = { Text(text = stringResource(R.string.title_initial_setup)) },
                 navigationIcon = {
                     if (setupMode != null) {
                         IconButton(onClick = { setupMode = null }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.content_desc_back))
                         }
                     }
                 }
@@ -66,14 +68,14 @@ fun SetupScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "欢迎使用 PicKeep",
+                        text = stringResource(R.string.title_welcome),
                         style = MaterialTheme.typography.headlineMedium
                     )
                     
                     Spacer(modifier = Modifier.height(8.dp))
                     
                     Text(
-                        text = "零知识加密的照片备份",
+                        text = stringResource(R.string.subtitle_zero_knowledge),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -86,7 +88,7 @@ fun SetupScreen(
                             .fillMaxWidth()
                             .height(56.dp)
                     ) {
-                        Text("创建新账户")
+                        Text(text = stringResource(R.string.btn_create_account))
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -97,7 +99,7 @@ fun SetupScreen(
                             .fillMaxWidth()
                             .height(56.dp)
                     ) {
-                        Text("使用助记词恢复")
+                        Text(text = stringResource(R.string.btn_recover_with_mnemonic))
                     }
                     
                     Spacer(modifier = Modifier.height(16.dp))
@@ -110,7 +112,7 @@ fun SetupScreen(
                     ) {
                         Icon(Icons.Default.Camera, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("扫描二维码恢复")
+                        Text(text = stringResource(R.string.btn_recover_with_qr))
                     }
                 }
             } else {
@@ -140,6 +142,7 @@ fun NewAccountFlow(
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     // 生成临时助记词（仅显示，实际初始化时会重新生成或传入）
     // 为了简化，我们在 SettingsRepository.initialize 时生成并返回。
@@ -158,14 +161,14 @@ fun NewAccountFlow(
     ) {
         if (step == NewAccountStep.SHOW_MNEMONIC) {
             Text(
-                text = "备份助记词",
+                text = stringResource(R.string.title_backup_mnemonic),
                 style = MaterialTheme.typography.titleLarge
             )
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "请按顺序抄写以下 12 个单词。如果丢失密码或设备，这是恢复数据的唯一方式。",
+                text = stringResource(R.string.msg_backup_mnemonic),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.error
             )
@@ -180,13 +183,13 @@ fun NewAccountFlow(
                 onClick = { step = NewAccountStep.SET_PASSWORD },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text("我已备份")
+                Text(text = stringResource(R.string.btn_mnemonic_backed_up))
             }
             
         } else {
             // 设置密码
             Text(
-                text = "设置主密码",
+                text = stringResource(R.string.title_set_master_password),
                 style = MaterialTheme.typography.titleLarge
             )
             
@@ -195,7 +198,7 @@ fun NewAccountFlow(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMessage = null },
-                label = { Text("密码") },
+                label = { Text(stringResource(R.string.label_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -205,7 +208,7 @@ fun NewAccountFlow(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; errorMessage = null },
-                label = { Text("确认密码") },
+                label = { Text(stringResource(R.string.label_confirm_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -223,11 +226,11 @@ fun NewAccountFlow(
             Button(
                 onClick = {
                     if (password != confirmPassword) {
-                        errorMessage = "两次密码输入不一致"
+                        errorMessage = context.getString(R.string.error_password_mismatch)
                         return@Button
                     }
                     if (password.isEmpty()) {
-                        errorMessage = "密码不能为空"
+                        errorMessage = context.getString(R.string.error_password_empty)
                         return@Button
                     }
                     
@@ -236,7 +239,7 @@ fun NewAccountFlow(
                         settingsRepository.initialize(password, mnemonicList)
                         onSetupComplete()
                     } catch (e: Exception) {
-                        errorMessage = e.message ?: "初始化失败"
+                        errorMessage = e.message ?: context.getString(R.string.error_initialize_failed)
                     } finally {
                         isLoading = false
                     }
@@ -250,7 +253,7 @@ fun NewAccountFlow(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("完成设置")
+                    Text(text = stringResource(R.string.btn_finish_setup))
                 }
             }
         }
@@ -272,6 +275,7 @@ fun RestoreAccountFlow(
     var confirmPassword by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var isLoading by remember { mutableStateOf(false) }
+    val context = LocalContext.current
     
     Column(
         modifier = Modifier
@@ -283,7 +287,7 @@ fun RestoreAccountFlow(
     ) {
         if (step == RestoreAccountStep.ENTER_MNEMONIC) {
             Text(
-                text = "恢复账户",
+                text = stringResource(R.string.title_recover_account),
                 style = MaterialTheme.typography.titleLarge
             )
             
@@ -292,7 +296,7 @@ fun RestoreAccountFlow(
             OutlinedTextField(
                 value = mnemonicInput,
                 onValueChange = { mnemonicInput = it; errorMessage = null },
-                label = { Text("输入助记词 (空格分隔)") },
+                label = { Text(stringResource(R.string.label_input_mnemonic)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
@@ -313,7 +317,7 @@ fun RestoreAccountFlow(
                 onClick = {
                     val words = mnemonicInput.trim().split("\\s+".toRegex())
                     if (words.size !in listOf(12, 15, 18, 21, 24)) {
-                        errorMessage = "助记词长度无效 (当前: ${words.size}, 应为 12/15/18/21/24)"
+                        errorMessage = context.getString(R.string.error_invalid_mnemonic_length, words.size)
                         return@Button
                     }
                     // 简单验证（实际应用应校验 Checksum）
@@ -322,13 +326,13 @@ fun RestoreAccountFlow(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = mnemonicInput.isNotBlank()
             ) {
-                Text("下一步")
+                Text(text = stringResource(R.string.btn_next))
             }
             
         } else {
             // 设置新密码
             Text(
-                text = "设置新密码",
+                text = stringResource(R.string.title_set_new_password),
                 style = MaterialTheme.typography.titleLarge
             )
             
@@ -337,7 +341,7 @@ fun RestoreAccountFlow(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMessage = null },
-                label = { Text("新密码") },
+                label = { Text(stringResource(R.string.label_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -347,7 +351,7 @@ fun RestoreAccountFlow(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; errorMessage = null },
-                label = { Text("确认密码") },
+                label = { Text(stringResource(R.string.label_confirm_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -365,11 +369,11 @@ fun RestoreAccountFlow(
             Button(
                 onClick = {
                     if (password != confirmPassword) {
-                        errorMessage = "两次密码输入不一致"
+                        errorMessage = context.getString(R.string.error_password_mismatch)
                         return@Button
                     }
                     if (password.isEmpty()) {
-                        errorMessage = "密码不能为空"
+                        errorMessage = context.getString(R.string.error_password_empty)
                         return@Button
                     }
                     
@@ -379,7 +383,7 @@ fun RestoreAccountFlow(
                         settingsRepository.initialize(password, words)
                         onSetupComplete()
                     } catch (e: Exception) {
-                        errorMessage = e.message ?: "恢复失败，请检查助记词是否正确"
+                        errorMessage = e.message ?: context.getString(R.string.error_recover_failed_check_mnemonic)
                     } finally {
                         isLoading = false
                     }
@@ -393,7 +397,7 @@ fun RestoreAccountFlow(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("恢复账户")
+                    Text(text = stringResource(R.string.title_recover_account))
                 }
             }
         }
@@ -437,7 +441,7 @@ fun RestoreAccountQrFlow(
                 mnemonicInput = mnemonic.joinToString(" ")
                 errorMessage = null
             } else {
-                errorMessage = "二维码格式无效，请确保扫描的是正确的恢复二维码"
+                errorMessage = context.getString(R.string.error_invalid_qr_format)
             }
         } else {
             // 扫描取消，不显示错误
@@ -448,7 +452,7 @@ fun RestoreAccountQrFlow(
     fun startScan() {
         val options = ScanOptions()
         options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
-        options.setPrompt("将二维码对准扫描框")
+        options.setPrompt(context.getString(R.string.hint_qr_align))
         // 使用自定义竖屏扫码 Activity
         options.setCaptureActivity(net.kagamir.pickeep.ui.qr.QrCaptureActivity::class.java)
         options.setCameraId(0)
@@ -466,7 +470,7 @@ fun RestoreAccountQrFlow(
             // 权限已授予，启动扫描
             startScan()
         } else {
-            errorMessage = "需要相机权限才能扫描二维码"
+            errorMessage = context.getString(R.string.error_camera_permission_required)
         }
     }
     
@@ -480,14 +484,14 @@ fun RestoreAccountQrFlow(
     ) {
         if (step == RestoreAccountStep.ENTER_MNEMONIC) {
             Text(
-                text = "扫描恢复二维码",
+                text = stringResource(R.string.title_scan_recover_qr),
                 style = MaterialTheme.typography.titleLarge
             )
             
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "使用另一台设备上显示的恢复二维码进行扫描",
+                text = stringResource(R.string.msg_scan_recover_qr),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -506,7 +510,7 @@ fun RestoreAccountQrFlow(
             ) {
                 Icon(Icons.Default.Camera, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("扫描二维码")
+                Text(text = stringResource(R.string.btn_scan_qr))
             }
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -516,7 +520,7 @@ fun RestoreAccountQrFlow(
             Spacer(modifier = Modifier.height(16.dp))
             
             Text(
-                text = "或手动输入助记词",
+                text = stringResource(R.string.title_or_input_mnemonic),
                 style = MaterialTheme.typography.titleMedium
             )
             
@@ -525,7 +529,7 @@ fun RestoreAccountQrFlow(
             OutlinedTextField(
                 value = mnemonicInput,
                 onValueChange = { mnemonicInput = it; errorMessage = null },
-                label = { Text("输入助记词 (空格分隔)") },
+                label = { Text(stringResource(R.string.label_input_mnemonic)) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(120.dp),
@@ -546,11 +550,11 @@ fun RestoreAccountQrFlow(
                 onClick = {
                     val words = mnemonicInput.trim().split("\\s+".toRegex())
                     if (words.size !in listOf(12, 15, 18, 21, 24)) {
-                        errorMessage = "助记词长度无效 (当前: ${words.size}, 应为 12/15/18/21/24)"
+                        errorMessage = context.getString(R.string.error_invalid_mnemonic_length, words.size)
                         return@Button
                     }
                     if (words.isEmpty()) {
-                        errorMessage = "请输入助记词或扫描二维码"
+                        errorMessage = context.getString(R.string.error_mnemonic_or_qr_required)
                         return@Button
                     }
                     // 简单验证（实际应用应校验 Checksum）
@@ -559,13 +563,13 @@ fun RestoreAccountQrFlow(
                 modifier = Modifier.fillMaxWidth(),
                 enabled = mnemonicInput.isNotBlank()
             ) {
-                Text("下一步")
+                Text(text = stringResource(R.string.btn_next))
             }
             
         } else {
             // 设置新密码
             Text(
-                text = "设置新密码",
+                text = stringResource(R.string.title_set_new_password),
                 style = MaterialTheme.typography.titleLarge
             )
             
@@ -574,7 +578,7 @@ fun RestoreAccountQrFlow(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it; errorMessage = null },
-                label = { Text("新密码") },
+                label = { Text(stringResource(R.string.label_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -584,7 +588,7 @@ fun RestoreAccountQrFlow(
             OutlinedTextField(
                 value = confirmPassword,
                 onValueChange = { confirmPassword = it; errorMessage = null },
-                label = { Text("确认密码") },
+                label = { Text(stringResource(R.string.label_confirm_password)) },
                 visualTransformation = PasswordVisualTransformation(),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -602,11 +606,11 @@ fun RestoreAccountQrFlow(
             Button(
                 onClick = {
                     if (password != confirmPassword) {
-                        errorMessage = "两次密码输入不一致"
+                        errorMessage = context.getString(R.string.error_password_mismatch)
                         return@Button
                     }
                     if (password.isEmpty()) {
-                        errorMessage = "密码不能为空"
+                        errorMessage = context.getString(R.string.error_password_empty)
                         return@Button
                     }
                     
@@ -616,7 +620,7 @@ fun RestoreAccountQrFlow(
                         settingsRepository.initialize(password, words)
                         onSetupComplete()
                     } catch (e: Exception) {
-                        errorMessage = e.message ?: "恢复失败，请检查助记词是否正确"
+                        errorMessage = e.message ?: context.getString(R.string.error_recover_failed_check_mnemonic)
                     } finally {
                         isLoading = false
                     }
@@ -630,7 +634,7 @@ fun RestoreAccountQrFlow(
                         color = MaterialTheme.colorScheme.onPrimary
                     )
                 } else {
-                    Text("恢复账户")
+                    Text(text = stringResource(R.string.title_recover_account))
                 }
             }
         }
