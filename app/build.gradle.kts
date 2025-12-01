@@ -7,9 +7,9 @@ plugins {
 }
 
 // CI 环境下使用的签名信息，从环境变量中读取（GitHub Actions 的 secrets 会自动注入为环境变量）
-val keystorePassword: String? = System.getenv("SIGNING_KEYSTORE_PASSWORD")
-val keyAlias: String? = System.getenv("SIGNING_KEY_ALIAS")
-val keyPassword: String? = System.getenv("SIGNING_KEY_PASSWORD")
+val envKeystorePassword: String? = System.getenv("SIGNING_KEYSTORE_PASSWORD")
+val envKeyAlias: String? = System.getenv("SIGNING_KEY_ALIAS")
+val envKeyPassword: String? = System.getenv("SIGNING_KEY_PASSWORD")
 
 android {
     namespace = "net.kagamir.pickeep"
@@ -28,16 +28,16 @@ android {
     signingConfigs {
         // 仅在 CI 中依赖外部 keystore（app/release.jks），本地如果没有环境变量可以继续用 debug 构建
         if (
-            keystorePassword != null &&
-            keyAlias != null &&
-            keyPassword != null
+            envKeystorePassword != null &&
+            envKeyAlias != null &&
+            envKeyPassword != null
         ) {
             create("release") {
                 // keystore 文件路径相对于 app/ 模块根目录
                 storeFile = file("release.jks")
-                storePassword = keystorePassword
-                this.keyAlias = keyAlias
-                this.keyPassword = keyPassword
+                storePassword = envKeystorePassword
+                keyAlias = envKeyAlias
+                keyPassword = envKeyPassword
             }
         }
     }
@@ -51,7 +51,11 @@ android {
             )
             // 关联上面的 release 签名配置，在 CI 中生成已签名的 release APK
             // 只在环境变量存在时才使用 release 签名配置,否则使用 debug 签名
-            if (keystorePassword != null && keyAlias != null && keyPassword != null) {
+            if (
+                envKeystorePassword != null &&
+                envKeyAlias != null &&
+                envKeyPassword != null
+            ) {
                 signingConfig = signingConfigs.getByName("release")
             }
         }
