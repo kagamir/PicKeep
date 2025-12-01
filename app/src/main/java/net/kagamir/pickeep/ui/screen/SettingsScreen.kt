@@ -5,6 +5,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -17,7 +18,7 @@ import net.kagamir.pickeep.storage.webdav.WebDavClient
 /**
  * 设置界面
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     settingsRepository: SettingsRepository,
@@ -30,6 +31,8 @@ fun SettingsScreen(
     var syncInterval by remember { mutableStateOf(12L) }
     var syncOnlyOnWifi by remember { mutableStateOf(true) }
     var syncOnlyWhenCharging by remember { mutableStateOf(false) }
+    var monitoredExtensions by remember { mutableStateOf(setOf<String>()) }
+    var extensionInput by remember { mutableStateOf("") }
     var isTestingConnection by remember { mutableStateOf(false) }
     var testResult by remember { mutableStateOf<String?>(null) }
     var saveResult by remember { mutableStateOf<String?>(null) }
@@ -53,6 +56,7 @@ fun SettingsScreen(
             syncInterval = settings.syncIntervalHours
             syncOnlyOnWifi = settings.syncOnlyOnWifi
             syncOnlyWhenCharging = settings.syncOnlyWhenCharging
+            monitoredExtensions = settings.monitoredExtensions
         }
     }
     
@@ -236,7 +240,8 @@ fun SettingsScreen(
                                 autoSync = autoSync,
                                 syncIntervalHours = syncInterval,
                                 syncOnlyOnWifi = syncOnlyOnWifi,
-                                syncOnlyWhenCharging = syncOnlyWhenCharging
+                                syncOnlyWhenCharging = syncOnlyWhenCharging,
+                                monitoredExtensions = monitoredExtensions
                             )
                         )
                     }
@@ -260,7 +265,8 @@ fun SettingsScreen(
                                 autoSync = autoSync,
                                 syncIntervalHours = syncInterval,
                                 syncOnlyOnWifi = syncOnlyOnWifi,
-                                syncOnlyWhenCharging = syncOnlyWhenCharging
+                                syncOnlyWhenCharging = syncOnlyWhenCharging,
+                                monitoredExtensions = monitoredExtensions
                             )
                         )
                     }
@@ -281,7 +287,8 @@ fun SettingsScreen(
                                 autoSync = autoSync,
                                 syncIntervalHours = syncInterval,
                                 syncOnlyOnWifi = syncOnlyOnWifi,
-                                syncOnlyWhenCharging = syncOnlyWhenCharging
+                                syncOnlyWhenCharging = syncOnlyWhenCharging,
+                                monitoredExtensions = monitoredExtensions
                             )
                         )
                     }
@@ -302,11 +309,137 @@ fun SettingsScreen(
                                 autoSync = autoSync,
                                 syncIntervalHours = syncInterval,
                                 syncOnlyOnWifi = syncOnlyOnWifi,
-                                syncOnlyWhenCharging = syncOnlyWhenCharging
+                                syncOnlyWhenCharging = syncOnlyWhenCharging,
+                                monitoredExtensions = monitoredExtensions
                             )
                         )
                     }
                 )
+            }
+            
+            HorizontalDivider()
+            
+            // 监控的文件类型
+            Text(
+                text = "监控的文件类型",
+                style = MaterialTheme.typography.titleMedium
+            )
+            
+            Text(
+                text = "配置需要监控的文件后缀（不含点号）",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            // 显示当前配置的标签
+            if (monitoredExtensions.isNotEmpty()) {
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    monitoredExtensions.forEach { ext ->
+                        InputChip(
+                            selected = false,
+                            onClick = { },
+                            label = { Text(ext) },
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        val newExtensions = monitoredExtensions.toMutableSet().apply {
+                                            remove(ext)
+                                        }
+                                        // 如果全部删除，恢复默认值
+                                        val finalExtensions = if (newExtensions.isEmpty()) {
+                                            SettingsRepository.SyncSettings.DEFAULT_MONITORED_EXTENSIONS
+                                        } else {
+                                            newExtensions
+                                        }
+                                        monitoredExtensions = finalExtensions
+                                        settingsRepository.saveSyncSettings(
+                                            SettingsRepository.SyncSettings(
+                                                autoSync = autoSync,
+                                                syncIntervalHours = syncInterval,
+                                                syncOnlyOnWifi = syncOnlyOnWifi,
+                                                syncOnlyWhenCharging = syncOnlyWhenCharging,
+                                                monitoredExtensions = finalExtensions
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier.size(18.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Close,
+                                        contentDescription = "删除",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+            
+            // 添加新后缀的输入框
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = extensionInput,
+                    onValueChange = { 
+                        // 只允许字母和数字
+                        extensionInput = it.filter { char -> char.isLetterOrDigit() }.lowercase()
+                    },
+                    label = { Text("文件后缀") },
+                    placeholder = { Text("例如: jpg") },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true
+                )
+                Button(
+                    onClick = {
+                        val trimmed = extensionInput.trim().lowercase()
+                        if (trimmed.isNotBlank() && trimmed.all { it.isLetterOrDigit() }) {
+                            val newExtensions = monitoredExtensions.toMutableSet().apply {
+                                add(trimmed)
+                            }
+                            monitoredExtensions = newExtensions
+                            extensionInput = ""
+                            settingsRepository.saveSyncSettings(
+                                SettingsRepository.SyncSettings(
+                                    autoSync = autoSync,
+                                    syncIntervalHours = syncInterval,
+                                    syncOnlyOnWifi = syncOnlyOnWifi,
+                                    syncOnlyWhenCharging = syncOnlyWhenCharging,
+                                    monitoredExtensions = newExtensions
+                                )
+                            )
+                        }
+                    },
+                    enabled = extensionInput.trim().isNotBlank()
+                ) {
+                    Text("添加")
+                }
+            }
+            
+            // 恢复默认按钮
+            OutlinedButton(
+                onClick = {
+                    val defaultExtensions = SettingsRepository.SyncSettings.DEFAULT_MONITORED_EXTENSIONS
+                    monitoredExtensions = defaultExtensions
+                    settingsRepository.saveSyncSettings(
+                        SettingsRepository.SyncSettings(
+                            autoSync = autoSync,
+                            syncIntervalHours = syncInterval,
+                            syncOnlyOnWifi = syncOnlyOnWifi,
+                            syncOnlyWhenCharging = syncOnlyWhenCharging,
+                            monitoredExtensions = defaultExtensions
+                        )
+                    )
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("恢复默认")
             }
             
             HorizontalDivider()

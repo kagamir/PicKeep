@@ -55,6 +55,14 @@ interface PhotoDao {
     @Query("UPDATE photos SET sync_status = :status WHERE id = :photoId")
     suspend fun updateStatus(photoId: Long, status: SyncStatus)
     
+    /**
+     * 原子性地将文件状态从旧状态更新为新状态
+     * 只有当文件当前状态匹配 oldStatus 时才会更新
+     * @return 更新的行数（0 表示状态不匹配，1 表示更新成功）
+     */
+    @Query("UPDATE photos SET sync_status = :newStatus WHERE id = :photoId AND sync_status = :oldStatus")
+    suspend fun updateStatusIfMatch(photoId: Long, oldStatus: SyncStatus, newStatus: SyncStatus): Int
+    
     @Query("UPDATE photos SET sync_status = :newStatus WHERE sync_status = :oldStatus")
     suspend fun updateStatusByStatus(oldStatus: SyncStatus, newStatus: SyncStatus)
     

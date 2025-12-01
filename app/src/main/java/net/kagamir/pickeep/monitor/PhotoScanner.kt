@@ -15,7 +15,8 @@ import java.io.File
  */
 class PhotoScanner(
     private val context: Context,
-    private val database: PicKeepDatabase
+    private val database: PicKeepDatabase,
+    private val monitoredExtensions: Set<String>
 ) {
     
     private val photoDao = database.photoDao()
@@ -106,9 +107,9 @@ class PhotoScanner(
                 val mtime = cursor.getLong(modifiedColumn) * 1000  // 转换为毫秒
                 val size = cursor.getLong(sizeColumn)
                 
-                // 验证文件是否存在
+                // 验证文件是否存在且符合配置的后缀
                 val file = File(path)
-                if (file.exists() && file.isFile) {
+                if (file.exists() && file.isFile && isMediaFile(file.name)) {
                     photos.add(
                         PhotoEntity(
                             localPath = path,
@@ -177,10 +178,7 @@ class PhotoScanner(
      */
     private fun isMediaFile(filename: String): Boolean {
         val extension = filename.substringAfterLast('.', "").lowercase()
-        return extension in setOf(
-            "jpg", "jpeg", "png", "gif", "webp", "heic", "heif",
-            "mp4", "mkv", "avi", "mov", "3gp"
-        )
+        return extension in monitoredExtensions
     }
 }
 

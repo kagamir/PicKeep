@@ -1,6 +1,8 @@
 package net.kagamir.pickeep.ui.screen
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
@@ -16,7 +18,9 @@ import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.data.local.entity.SyncStatus
 import net.kagamir.pickeep.data.repository.SettingsRepository
 import net.kagamir.pickeep.monitor.PhotoScanner
+import net.kagamir.pickeep.sync.FileUploadState
 import net.kagamir.pickeep.sync.SyncState
+import net.kagamir.pickeep.sync.UploadStep
 import net.kagamir.pickeep.worker.WorkManagerScheduler
 
 /**
@@ -83,7 +87,8 @@ fun SyncStatusScreen(
         scope.launch {
             isScanning = true
             try {
-                val photoScanner = PhotoScanner(context, database)
+                val monitoredExtensions = settingsRepository.syncSettings.first().monitoredExtensions
+                val photoScanner = PhotoScanner(context, database, monitoredExtensions)
                 val newCount = photoScanner.scanForChanges()
                 android.util.Log.d("SyncStatusScreen", "扫描完成，发现 $newCount 个新照片")
                 snackbarHostState.showSnackbar(
@@ -110,7 +115,20 @@ fun SyncStatusScreen(
                     ) {
                         Icon(Icons.Default.Refresh, "重新扫描")
                     }
-                    IconButton(onClick = onNavigateToSettings) {
+                    IconButton(
+                        onClick = {
+                            if (syncStateValue.isSyncing) {
+                                // 正在同步时，显示提示
+                                scope.launch {
+                                    snackbarHostState.showSnackbar("请先取消当前同步任务")
+                                }
+                            } else {
+                                // 正常导航到设置页面
+                                onNavigateToSettings()
+                            }
+                        },
+                        enabled = !syncStateValue.isSyncing
+                    ) {
                         Icon(Icons.Default.Settings, "设置")
                     }
                 }
@@ -149,6 +167,7 @@ fun SyncStatusScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
@@ -206,22 +225,31 @@ fun SyncStatusScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = if (syncStateValue.isPaused) "同步已暂停" else "正在同步...",
-                                    style = MaterialTheme.typography.titleMedium
-                                )
-                                if (syncStateValue.currentFileName != null) {
-                                    Text(
-                                        text = "上传: ${syncStateValue.currentFileName} (${syncStateValue.currentProgress}%)",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
+                            Text(
+                                text = if (syncStateValue.isPaused) "同步已暂停" else "正在同步...",
+                                style = MaterialTheme.typography.titleMedium
+                            )
                             if (!syncStateValue.isPaused) {
                                 CircularProgressIndicator(modifier = Modifier.size(24.dp))
                             }
+                        }
+                        
+                        // 显示所有正在上传的文件
+                        if (syncStateValue.activeUploads.isNotEmpty()) {
+                            Column(
+                                verticalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                syncStateValue.activeUploads.values.forEach { fileState ->
+                                    FileUploadItem(fileState)
+                                }
+                            }
+                        } else {
+                            Text(
+                                text = "准备中...",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                         
                         // 暂停/继续按钮
@@ -258,7 +286,7 @@ fun SyncStatusScreen(
                 }
             }
             
-            Spacer(modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.height(16.dp))
             
             // 提示信息
             if (!settingsRepository.isUnlocked()) {
@@ -301,6 +329,97 @@ private fun StatusRow(
             else
                 MaterialTheme.colorScheme.onSurface
         )
+    }
+}
+
+/**
+ * 格式化文件大小
+ */
+private fun formatFileSize(bytes: Long): String {
+    return when {
+        bytes < 1024 -> "$bytes B"
+        bytes < 1024 * 1024 -> String.format("%.1f KB", bytes / 1024.0)
+        bytes < 1024 * 1024 * 1024 -> String.format("%.1f MB", bytes / (1024.0 * 1024.0))
+        else -> String.format("%.2f GB", bytes / (1024.0 * 1024.0 * 1024.0))
+    }
+}
+
+/**
+ * 获取步骤文本
+ */
+private fun getStepText(step: UploadStep): String {
+    return when (step) {
+        UploadStep.HASHING -> "计算哈希"
+        UploadStep.ENCRYPTING -> "加密文件"
+        UploadStep.GENERATING_PATH -> "生成路径"
+        UploadStep.UPLOADING_FILE -> "上传文件"
+        UploadStep.UPLOADING_METADATA -> "上传元数据"
+    }
+}
+
+/**
+ * 文件上传项组件
+ */
+@Composable
+private fun FileUploadItem(fileState: FileUploadState) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // 文件名和大小
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = fileState.fileName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+                Text(
+                    text = formatFileSize(fileState.fileSize),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            
+            // 当前步骤
+            Text(
+                text = getStepText(fileState.currentStep),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.primary
+            )
+            
+            // 进度条
+            if (fileState.progress >= 0) {
+                // 有确定进度的线性进度条
+                LinearProgressIndicator(
+                    progress = { fileState.progress / 100f },
+                    modifier = Modifier.fillMaxWidth()
+                )
+                // 显示进度百分比
+                Text(
+                    text = "${fileState.progress}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.align(Alignment.End)
+                )
+            } else {
+                // 不确定进度的线性进度条
+                LinearProgressIndicator(
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        }
     }
 }
 

@@ -25,48 +25,57 @@ object FileEncryptor {
     private val BC_PROVIDER by lazy { BouncyCastleProvider() }
     
     /**
-     * 加密文件（使用文件路径，自动检测视频文件）
+     * 加密文件（使用文件路径）
      * 
      * 格式: [Version (1 byte)][IV (12 bytes)][Ciphertext...][Tag (16 bytes)]
      * 
      * @param filePath 文件路径
      * @param outputStream 输出流（加密文件）
      * @param cek 内容加密密钥
-     * @return 加密前文件的哈希（视频使用指纹，其他使用SHA-256）
+     * @return 加密前文件的 SHA-256 哈希
      */
     fun encryptFile(
         filePath: String,
         outputStream: OutputStream,
         cek: ByteArray
     ): String {
+        return encryptFile(filePath, outputStream, cek, null, null)
+    }
+    
+    /**
+     * 加密文件（使用文件路径，支持进度回调）
+     * 
+     * 格式: [Version (1 byte)][IV (12 bytes)][Ciphertext...][Tag (16 bytes)]
+     * 
+     * @param filePath 文件路径
+     * @param outputStream 输出流（加密文件）
+     * @param cek 内容加密密钥
+     * @param onHashProgress 哈希计算进度回调 (已处理字节, 总字节)
+     * @param onEncryptProgress 加密进度回调 (已处理字节, 总字节)
+     * @return 加密前文件的 SHA-256 哈希
+     */
+    fun encryptFile(
+        filePath: String,
+        outputStream: OutputStream,
+        cek: ByteArray,
+        onHashProgress: ((Long, Long) -> Unit)?,
+        onEncryptProgress: ((Long, Long) -> Unit)?
+    ): String {
         val file = File(filePath)
         if (!file.exists()) {
             throw IllegalArgumentException("文件不存在: $filePath")
         }
         
-        // 检测是否为视频文件
-        val isVideo = isVideoFile(filePath)
+        val fileSize = file.length()
         
-        // 如果是视频文件，使用视频指纹计算
-        val hash = if (isVideo) {
-            try {
-                VideoFingerprintCalculator.calculateFingerprint(filePath)
-            } catch (e: Exception) {
-                // 如果视频指纹计算失败，回退到SHA-256
-                FileInputStream(file).use { input ->
-                    calculateHash(input)
-                }
-            }
-        } else {
-            // 非视频文件使用SHA-256
-            FileInputStream(file).use { input ->
-                calculateHash(input)
-            }
+        // 统一使用SHA-256计算哈希（包括视频文件）
+        val hash = FileInputStream(file).use { input ->
+            calculateHashWithProgress(input, fileSize, onHashProgress)
         }
         
         // 加密文件
         FileInputStream(file).use { input ->
-            encryptFileStream(input, outputStream, cek)
+            encryptFileStreamWithProgress(input, outputStream, cek, fileSize, onEncryptProgress)
         }
         
         return hash
@@ -141,6 +150,19 @@ object FileEncryptor {
         outputStream: OutputStream,
         cek: ByteArray
     ) {
+        encryptFileStreamWithProgress(inputStream, outputStream, cek, null, null)
+    }
+    
+    /**
+     * 加密文件流（内部方法，不计算哈希，支持进度回调）
+     */
+    private fun encryptFileStreamWithProgress(
+        inputStream: InputStream,
+        outputStream: OutputStream,
+        cek: ByteArray,
+        totalSize: Long?,
+        onProgress: ((Long, Long) -> Unit)?
+    ) {
         require(cek.size == 32) { "CEK 长度必须为 32 字节" }
         
         val iv = ByteArray(IV_LENGTH_BYTES)
@@ -158,6 +180,7 @@ object FileEncryptor {
         val buffer = ByteArray(CHUNK_SIZE)
         val outputBuffer = ByteArray(cipher.getOutputSize(CHUNK_SIZE))
         var bytesRead: Int
+        var processedBytes = 0L
         
         inputStream.use { input ->
             outputStream.use { output ->
@@ -167,6 +190,11 @@ object FileEncryptor {
                     if (outLen > 0) {
                         output.write(outputBuffer, 0, outLen)
                     }
+                    
+                    processedBytes += bytesRead
+                    if (onProgress != null && totalSize != null) {
+                        onProgress(processedBytes, totalSize)
+                    }
                 }
                 
                 // 写入最后的数据块和认证标签
@@ -174,8 +202,45 @@ object FileEncryptor {
                 if (finalBytes.isNotEmpty()) {
                     output.write(finalBytes)
                 }
+                
+                // 最终进度回调
+                if (onProgress != null && totalSize != null) {
+                    onProgress(totalSize, totalSize)
+                }
             }
         }
+    }
+    
+    /**
+     * 计算文件的 SHA-256 哈希（支持进度回调）
+     */
+    private fun calculateHashWithProgress(
+        inputStream: InputStream,
+        totalSize: Long?,
+        onProgress: ((Long, Long) -> Unit)?
+    ): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(CHUNK_SIZE)
+        var bytesRead: Int
+        var processedBytes = 0L
+        
+        inputStream.use { input ->
+            while (input.read(buffer).also { bytesRead = it } != -1) {
+                digest.update(buffer, 0, bytesRead)
+                processedBytes += bytesRead
+                
+                if (onProgress != null && totalSize != null) {
+                    onProgress(processedBytes, totalSize)
+                }
+            }
+        }
+        
+        // 最终进度回调
+        if (onProgress != null && totalSize != null) {
+            onProgress(totalSize, totalSize)
+        }
+        
+        return digest.digest().joinToString("") { "%02x".format(it) }
     }
     
     /**
@@ -242,13 +307,6 @@ object FileEncryptor {
         }
         
         return digest.digest().joinToString("") { "%02x".format(it) }
-    }
-    
-    /**
-     * 计算视频文件的指纹（使用文件路径）
-     */
-    fun calculateVideoFingerprint(filePath: String): String {
-        return VideoFingerprintCalculator.calculateFingerprint(filePath)
     }
     
     /**

@@ -94,13 +94,6 @@ dependencies {
     implementation(libs.bouncycastle.bcprov)
     implementation(libs.bouncycastle.bcpkix)
     
-    // OpenCV for video processing
-    // Note: OpenCV Android typically requires local AAR file
-    // Download from https://opencv.org/releases/ and place in app/libs/
-    // Then use: implementation(files("libs/opencv-android-sdk.aar"))
-    // For now, trying Maven Central (may need adjustment)
-    implementation("org.opencv:opencv:4.10.0")
-    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

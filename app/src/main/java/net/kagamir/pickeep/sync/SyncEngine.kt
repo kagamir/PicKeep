@@ -2,16 +2,22 @@ package net.kagamir.pickeep.sync
 
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.data.local.entity.SyncStatus
 import net.kagamir.pickeep.monitor.PhotoScanner
 import net.kagamir.pickeep.storage.StorageClient
 import net.kagamir.pickeep.storage.webdav.ChunkedUploader
+import net.kagamir.pickeep.sync.UploadStep
+import net.kagamir.pickeep.sync.FileUploadState
 import java.io.File
 import java.util.UUID
 
@@ -24,12 +30,17 @@ class SyncEngine(
     private val database: PicKeepDatabase,
     private val storageClient: StorageClient,
     private val masterKey: ByteArray,
-    private val syncState: SyncState
+    private val syncState: SyncState,
+    private val monitoredExtensions: Set<String>
 ) {
     
     private val photoDao = database.photoDao()
     private val deviceId: String = getOrCreateDeviceId()
-    private val photoScanner = PhotoScanner(context, database)
+    private val photoScanner = PhotoScanner(context, database, monitoredExtensions)
+    
+    // 当前同步任务的 Job，用于取消
+    @Volatile
+    private var currentSyncJob: Job? = null
     
     /**
      * 计算最优并发数
@@ -97,12 +108,40 @@ class SyncEngine(
      * 执行完整同步
      */
     suspend fun syncPhotos() = withContext(Dispatchers.IO) {
+        // 如果已经在同步，取消之前的同步任务
+        currentSyncJob?.cancel()
+        
         if (syncState.state.value.isSyncing) {
+            android.util.Log.w("SyncEngine", "同步已在进行中，取消之前的任务")
             return@withContext
         }
         
         try {
             syncState.startSync()
+            
+            // 保存当前同步任务的 Job
+            currentSyncJob = kotlinx.coroutines.currentCoroutineContext()[Job]
+            
+            // 0. 清理中断的同步任务和临时文件
+            // 0.1. 将所有 UPLOADING 状态的文件重置为 PENDING
+            // 这确保如果上次同步被中断，这些文件会在本次同步中被重新处理
+            photoDao.updateStatusByStatus(SyncStatus.UPLOADING, SyncStatus.PENDING)
+            
+            // 0.2. 清理缓存目录中的临时加密文件（.enc 文件）
+            // 这确保上次中断留下的临时文件被清理，避免占用磁盘空间和导致上传失败
+            try {
+                val cacheDir = context.cacheDir
+                if (cacheDir.exists() && cacheDir.isDirectory) {
+                    cacheDir.listFiles()?.forEach { file ->
+                        if (file.isFile && file.name.endsWith(".enc")) {
+                            file.delete()
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                // 清理临时文件失败不应该阻止同步继续
+                android.util.Log.w("SyncEngine", "清理临时文件失败", e)
+            }
             
             // 1. 扫描增量变化
             photoScanner.scanForChanges()
@@ -138,8 +177,18 @@ class SyncEngine(
             
             syncState.stopSync()
             
+        } catch (e: kotlinx.coroutines.CancellationException) {
+            // 同步被取消，清理状态
+            android.util.Log.d("SyncEngine", "同步被取消")
+            syncState.stopSync()
+            // 将所有 UPLOADING 状态的文件重置为 PENDING
+            photoDao.updateStatusByStatus(SyncStatus.UPLOADING, SyncStatus.PENDING)
+            throw e
         } catch (e: Exception) {
+            android.util.Log.e("SyncEngine", "同步失败", e)
             syncState.setError(e.message ?: "同步失败")
+        } finally {
+            currentSyncJob = null
         }
     }
     
@@ -169,51 +218,129 @@ class SyncEngine(
             val jobs = photos.map { photo ->
                 async(Dispatchers.IO) {
                     semaphore.acquire()
+                    val fileId = photo.id.toString()
+                    val fileName = File(photo.localPath).name
+                    val fileSize = photo.localSize
+                    
                     try {
+                        // 检查协程是否被取消
+                        ensureActive()
+                        
+                        // 检查文件是否已经在 activeUploads 中（防止重复处理）
+                        if (syncState.state.value.activeUploads.containsKey(fileId)) {
+                            android.util.Log.w(
+                                "SyncEngine",
+                                "文件已在处理中，跳过 - 文件ID: ${photo.id}, 路径: ${photo.localPath}"
+                            )
+                            return@async
+                        }
+                        
                         // 检查是否暂停
                         while (syncState.state.value.isPaused) {
+                            ensureActive() // 检查是否被取消
                             kotlinx.coroutines.delay(500)
                         }
                         
                         // 检查是否取消
+                        ensureActive()
                         if (!syncState.state.value.isSyncing) {
+                            android.util.Log.d("SyncEngine", "同步已取消，跳过文件: ${photo.localPath}")
                             return@async
                         }
                         
-                        // 更新状态
-                        updateSyncCounts()
+                        android.util.Log.d(
+                            "SyncEngine",
+                            "开始上传 - 文件ID: ${photo.id}, 路径: ${photo.localPath}, " +
+                            "大小: ${photo.localSize} 字节"
+                        )
                         
-                        // 上传
-                        syncState.updateCurrentUpload(File(photo.localPath).name, 0)
+                        // 立即添加文件状态到 activeUploads，确保 uploadingCount 准确
+                        // 这也可以作为锁，防止其他任务处理同一文件
+                        syncState.updateFileUploadState(
+                            fileId,
+                            FileUploadState(
+                                fileName = fileName,
+                                fileSize = fileSize,
+                                currentStep = UploadStep.HASHING,
+                                progress = 0,
+                                processedBytes = 0,
+                                totalBytes = fileSize
+                            )
+                        )
                         
-                        val result = uploadTask.uploadWithRetry(photo) { uploaded, total ->
-                            val progress = if (total > 0) {
-                                ((uploaded * 100) / total).toInt()
-                            } else {
-                                0
+                        // 再次检查，确保文件没有被其他任务处理
+                        ensureActive()
+                        
+                        // 创建步骤回调
+                        val onStep: (UploadStep, Long, Long?) -> Unit = { step, processed, total ->
+                            // 检查是否被取消
+                            try {
+                                ensureActive()
+                            } catch (e: kotlinx.coroutines.CancellationException) {
+                                // 被取消，停止更新状态
+                                throw e
                             }
-                            syncState.updateCurrentUpload(File(photo.localPath).name, progress)
+                            
+                            val progress = if (total != null && total > 0) {
+                                ((processed * 100) / total).toInt().coerceIn(0, 100)
+                            } else {
+                                -1 // 不确定进度
+                            }
+                            
+                            val fileState = FileUploadState(
+                                fileName = fileName,
+                                fileSize = fileSize,
+                                currentStep = step,
+                                progress = progress,
+                                processedBytes = processed,
+                                totalBytes = total ?: 0
+                            )
+                            
+                            syncState.updateFileUploadState(fileId, fileState)
                         }
                         
+                        // 创建上传进度回调（用于兼容旧代码）
+                        val onProgress: ((Long, Long) -> Unit)? = { uploaded, total ->
+                            // 上传进度已经在 onStep 中处理，这里可以留空或用于其他目的
+                        }
+                        
+                        // 上传
+                        val result = uploadTask.uploadWithRetry(photo, onProgress = onProgress, onStep = onStep)
+                        
                         if (result.isFailure) {
-                            // 记录失败
+                            // 记录失败（UploadTask 已经记录了详细错误，这里只记录简要信息）
                             val error = result.exceptionOrNull()
-                            android.util.Log.e("SyncEngine", "上传失败: ${photo.localPath}", error)
+                            android.util.Log.e(
+                                "SyncEngine",
+                                "上传任务失败 - 文件ID: ${photo.id}, 路径: ${photo.localPath}, " +
+                                "错误: ${error?.message ?: "未知错误"}"
+                            )
+                            // 失败的文件已由 UploadTask 更新为 FAILED 状态
+                            // 立即从 activeUploads 中移除，确保状态一致
+                            syncState.updateFileUploadState(fileId, null)
+                            // 立即更新统计，确保失败数量准确
+                            updateSyncCounts()
+                        } else {
+                            android.util.Log.d(
+                                "SyncEngine",
+                                "上传成功 - 文件ID: ${photo.id}, 路径: ${photo.localPath}"
+                            )
                         }
                         
                     } finally {
                         semaphore.release()
-                        syncState.updateCurrentUpload(null, 0)
+                        // 清除该文件的状态（如果还没有清除）
+                        syncState.updateFileUploadState(fileId, null)
                     }
                 }
             }
             
             // 等待所有任务完成
             jobs.awaitAll()
+            
+            // 批量完成后更新一次状态（减少数据库查询频率）
+            updateSyncCounts()
         }
-        
-        // 最后更新一次状态
-        updateSyncCounts()
     }
     
     /**
@@ -264,6 +391,10 @@ class SyncEngine(
      * 取消同步
      */
     fun cancelSync() {
+        android.util.Log.d("SyncEngine", "取消同步")
+        // 取消当前同步任务（这会触发 CancellationException，在 syncPhotos 中被捕获）
+        currentSyncJob?.cancel("用户取消同步")
+        // 停止同步状态
         syncState.stopSync()
     }
 }

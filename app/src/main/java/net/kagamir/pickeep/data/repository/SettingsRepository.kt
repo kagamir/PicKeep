@@ -54,11 +54,24 @@ class SettingsRepository(context: Context, private val database: PicKeepDatabase
             password = sharedPreferences.getString(KEY_WEBDAV_PASSWORD, "") ?: ""
         )
         
+        // 加载文件后缀列表
+        val extensionsString = sharedPreferences.getString(KEY_MONITORED_EXTENSIONS, null)
+        val monitoredExtensions = if (extensionsString.isNullOrBlank()) {
+            SyncSettings.DEFAULT_MONITORED_EXTENSIONS
+        } else {
+            extensionsString.split(",")
+                .map { it.trim().lowercase() }
+                .filter { it.isNotBlank() }
+                .toSet()
+                .takeIf { it.isNotEmpty() } ?: SyncSettings.DEFAULT_MONITORED_EXTENSIONS
+        }
+        
         _syncSettings.value = SyncSettings(
             autoSync = sharedPreferences.getBoolean(KEY_AUTO_SYNC, true),
             syncIntervalHours = sharedPreferences.getLong(KEY_SYNC_INTERVAL, 12),
             syncOnlyOnWifi = sharedPreferences.getBoolean(KEY_SYNC_WIFI_ONLY, true),
-            syncOnlyWhenCharging = sharedPreferences.getBoolean(KEY_SYNC_CHARGING_ONLY, false)
+            syncOnlyWhenCharging = sharedPreferences.getBoolean(KEY_SYNC_CHARGING_ONLY, false),
+            monitoredExtensions = monitoredExtensions
         )
     }
     
@@ -79,14 +92,22 @@ class SettingsRepository(context: Context, private val database: PicKeepDatabase
      * 保存同步设置
      */
     fun saveSyncSettings(settings: SyncSettings) {
+        // 如果后缀列表为空，使用默认值
+        val extensionsToSave = if (settings.monitoredExtensions.isEmpty()) {
+            SyncSettings.DEFAULT_MONITORED_EXTENSIONS
+        } else {
+            settings.monitoredExtensions
+        }
+        
         sharedPreferences.edit()
             .putBoolean(KEY_AUTO_SYNC, settings.autoSync)
             .putLong(KEY_SYNC_INTERVAL, settings.syncIntervalHours)
             .putBoolean(KEY_SYNC_WIFI_ONLY, settings.syncOnlyOnWifi)
             .putBoolean(KEY_SYNC_CHARGING_ONLY, settings.syncOnlyWhenCharging)
+            .putString(KEY_MONITORED_EXTENSIONS, extensionsToSave.joinToString(","))
             .apply()
         
-        _syncSettings.value = settings
+        _syncSettings.value = settings.copy(monitoredExtensions = extensionsToSave)
     }
     
     /**
@@ -175,8 +196,16 @@ class SettingsRepository(context: Context, private val database: PicKeepDatabase
         val autoSync: Boolean = true,
         val syncIntervalHours: Long = 12,
         val syncOnlyOnWifi: Boolean = true,
-        val syncOnlyWhenCharging: Boolean = false
-    )
+        val syncOnlyWhenCharging: Boolean = false,
+        val monitoredExtensions: Set<String> = DEFAULT_MONITORED_EXTENSIONS
+    ) {
+        companion object {
+            val DEFAULT_MONITORED_EXTENSIONS = setOf(
+                "jpg", "jpeg", "png", "gif", "webp", "heic", "heif",
+                "mp4", "mkv", "avi", "mov", "3gp"
+            )
+        }
+    }
     
     private companion object {
         const val KEY_WEBDAV_URL = "webdav_url"
@@ -186,5 +215,6 @@ class SettingsRepository(context: Context, private val database: PicKeepDatabase
         const val KEY_SYNC_INTERVAL = "sync_interval"
         const val KEY_SYNC_WIFI_ONLY = "sync_wifi_only"
         const val KEY_SYNC_CHARGING_ONLY = "sync_charging_only"
+        const val KEY_MONITORED_EXTENSIONS = "monitored_extensions"
     }
 }

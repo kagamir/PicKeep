@@ -20,6 +20,7 @@ import net.kagamir.pickeep.data.local.PicKeepDatabase
 import net.kagamir.pickeep.storage.webdav.WebDavClient
 import net.kagamir.pickeep.sync.SyncEngine
 import net.kagamir.pickeep.sync.SyncState
+import net.kagamir.pickeep.sync.UploadStep
 
 /**
  * 照片同步 Worker
@@ -64,6 +65,9 @@ class PhotoSyncWorker(
             val webdavUsername = webdavSettings.username
             val webdavPassword = webdavSettings.password
             
+            // 获取监控的文件后缀列表
+            val monitoredExtensions = settingsRepository.syncSettings.value.monitoredExtensions
+            
             // 创建存储客户端
             val storageClient = WebDavClient(webdavUrl, webdavUsername, webdavPassword)
             
@@ -73,7 +77,8 @@ class PhotoSyncWorker(
                 database,
                 storageClient,
                 masterKey,
-                syncState
+                syncState,
+                monitoredExtensions
             )
             
             // 使用 coroutineScope 确保所有协程在返回前完成
@@ -86,10 +91,25 @@ class PhotoSyncWorker(
                             if (state.isSyncing) {
                                 val message = if (state.isPaused) {
                                     "同步已暂停"
-                                } else if (state.currentFileName != null) {
-                                    "正在上传: ${state.currentFileName} (${state.currentProgress}%)"
                                 } else {
-                                    "同步中... (${state.syncedCount}/${state.pendingCount + state.syncedCount})"
+                                    // 显示第一个文件的状态或汇总信息
+                                    val firstUpload = state.activeUploads.values.firstOrNull()
+                                    if (firstUpload != null) {
+                                        val stepText = getStepText(firstUpload.currentStep)
+                                        val progressText = if (firstUpload.progress >= 0) {
+                                            " (${firstUpload.progress}%)"
+                                        } else {
+                                            ""
+                                        }
+                                        "$stepText: ${firstUpload.fileName}$progressText"
+                                    } else {
+                                        val total = state.pendingCount + state.uploadingCount + state.syncedCount + state.failedCount
+                                        if (total > 0) {
+                                            "同步中... (${state.syncedCount}/$total)"
+                                        } else {
+                                            "同步中..."
+                                        }
+                                    }
                                 }
                                 setForeground(createForegroundInfo(message, state.totalProgress))
                             }
@@ -183,6 +203,19 @@ class PhotoSyncWorker(
             val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE)
                     as NotificationManager
             notificationManager.createNotificationChannel(channel)
+        }
+    }
+    
+    /**
+     * 获取步骤文本
+     */
+    private fun getStepText(step: UploadStep): String {
+        return when (step) {
+            UploadStep.HASHING -> "计算哈希"
+            UploadStep.ENCRYPTING -> "加密文件"
+            UploadStep.GENERATING_PATH -> "生成路径"
+            UploadStep.UPLOADING_FILE -> "上传文件"
+            UploadStep.UPLOADING_METADATA -> "上传元数据"
         }
     }
     

@@ -5,6 +5,49 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
+ * 上传步骤枚举
+ */
+enum class UploadStep {
+    /** 哈希计算 */
+    HASHING,
+    
+    /** 加密 */
+    ENCRYPTING,
+    
+    /** 生成远程路径 */
+    GENERATING_PATH,
+    
+    /** 上传文件 */
+    UPLOADING_FILE,
+    
+    /** 上传元数据 */
+    UPLOADING_METADATA
+}
+
+/**
+ * 文件上传状态
+ */
+data class FileUploadState(
+    /** 文件名 */
+    val fileName: String,
+    
+    /** 文件大小（字节） */
+    val fileSize: Long,
+    
+    /** 当前步骤 */
+    val currentStep: UploadStep,
+    
+    /** 进度 (0-100)，-1 表示不确定 */
+    val progress: Int,
+    
+    /** 已处理字节数 */
+    val processedBytes: Long = 0,
+    
+    /** 总字节数 */
+    val totalBytes: Long = 0
+)
+
+/**
  * 同步状态管理（单例模式）
  */
 class SyncState private constructor() {
@@ -42,11 +85,8 @@ class SyncState private constructor() {
         /** 失败数量 */
         val failedCount: Int = 0,
         
-        /** 当前上传的文件名 */
-        val currentFileName: String? = null,
-        
-        /** 当前上传进度 (0-100) */
-        val currentProgress: Int = 0,
+        /** 正在上传的文件状态 Map，key 为文件 ID */
+        val activeUploads: Map<String, FileUploadState> = emptyMap(),
         
         /** 总进度 (0-100) */
         val totalProgress: Int = 0,
@@ -75,8 +115,7 @@ class SyncState private constructor() {
         _state.value = _state.value.copy(
             isSyncing = false,
             isPaused = false,
-            currentFileName = null,
-            currentProgress = 0,
+            activeUploads = emptyMap(),
             lastSyncTime = System.currentTimeMillis()
         )
     }
@@ -108,16 +147,27 @@ class SyncState private constructor() {
         synced: Int,
         failed: Int
     ) {
-        val total = pending + uploading + synced + failed
+        val currentState = _state.value
+        val activeUploadsCount = currentState.activeUploads.size
+        
+        // 优先使用 activeUploads 的大小作为正在上传的数量
+        // 因为它是实时更新的，比数据库查询更准确
+        val actualUploading = if (activeUploadsCount > 0) {
+            activeUploadsCount
+        } else {
+            uploading
+        }
+        
+        val total = pending + actualUploading + synced + failed
         val progress = if (total > 0) {
             ((synced + failed) * 100 / total)
         } else {
             100
         }
         
-        _state.value = _state.value.copy(
+        _state.value = currentState.copy(
             pendingCount = pending,
-            uploadingCount = uploading,
+            uploadingCount = actualUploading,
             syncedCount = synced,
             failedCount = failed,
             totalProgress = progress
@@ -125,13 +175,30 @@ class SyncState private constructor() {
     }
     
     /**
-     * 更新当前上传信息
+     * 更新文件上传状态
+     * @param fileId 文件 ID（通常为 photo.id.toString()）
+     * @param state 文件上传状态，为 null 时移除该文件的状态
      */
-    fun updateCurrentUpload(fileName: String?, progress: Int) {
-        _state.value = _state.value.copy(
-            currentFileName = fileName,
-            currentProgress = progress
+    fun updateFileUploadState(fileId: String, state: FileUploadState?) {
+        val currentState = _state.value
+        val newUploads = if (state == null) {
+            currentState.activeUploads - fileId
+        } else {
+            currentState.activeUploads + (fileId to state)
+        }
+        
+        _state.value = currentState.copy(
+            activeUploads = newUploads
         )
+    }
+    
+    /**
+     * 更新当前上传信息（向后兼容，保留但标记为废弃）
+     * @deprecated 使用 updateFileUploadState 代替
+     */
+    @Deprecated("使用 updateFileUploadState 代替", ReplaceWith("updateFileUploadState(fileId, state)"))
+    fun updateCurrentUpload(fileName: String?, progress: Int) {
+        // 为了向后兼容，暂时保留空实现
     }
     
     /**
