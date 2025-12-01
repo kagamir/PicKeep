@@ -1,5 +1,6 @@
 package net.kagamir.pickeep.ui.screen
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -8,12 +9,15 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.launch
 import net.kagamir.pickeep.data.repository.SettingsRepository
 import net.kagamir.pickeep.storage.webdav.WebDavClient
+import net.kagamir.pickeep.util.QrCodeHelper
 
 /**
  * 设置界面
@@ -37,9 +41,12 @@ fun SettingsScreen(
     var testResult by remember { mutableStateOf<String?>(null) }
     var saveResult by remember { mutableStateOf<String?>(null) }
     var showResetDialog by remember { mutableStateOf(false) }
+    var showQrCodeDialog by remember { mutableStateOf(false) }
+    var qrCodeBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     
     val scope = rememberCoroutineScope()
     val snackbarHostState = remember { SnackbarHostState() }
+    val isUnlocked = settingsRepository.isUnlocked()
     
     // 加载现有设置
     LaunchedEffect(Unit) {
@@ -81,6 +88,41 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showResetDialog = false }) {
                     Text("取消")
+                }
+            }
+        )
+    }
+    
+    if (showQrCodeDialog) {
+        AlertDialog(
+            onDismissRequest = { showQrCodeDialog = false },
+            title = { Text("恢复二维码") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = "请使用另一台设备扫描此二维码以恢复账户。请妥善保管，不要泄露给他人。",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    if (qrCodeBitmap != null) {
+                        Image(
+                            bitmap = qrCodeBitmap!!,
+                            contentDescription = "恢复二维码",
+                            modifier = Modifier
+                                .size(300.dp)
+                                .padding(16.dp)
+                        )
+                    } else {
+                        CircularProgressIndicator()
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showQrCodeDialog = false }) {
+                    Text("关闭")
                 }
             }
         )
@@ -441,6 +483,44 @@ fun SettingsScreen(
             ) {
                 Text("恢复默认")
             }
+            
+            HorizontalDivider()
+            
+            // 账户恢复
+            Text(
+                text = "账户恢复",
+                style = MaterialTheme.typography.titleMedium
+            )
+            
+            Button(
+                onClick = {
+                    if (!isUnlocked) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("请先解锁应用")
+                        }
+                        return@Button
+                    }
+                    try {
+                        val mnemonic = settingsRepository.exportMnemonic()
+                        qrCodeBitmap = QrCodeHelper.generateRecoveryQrCode(mnemonic)
+                        showQrCodeDialog = true
+                    } catch (e: Exception) {
+                        scope.launch {
+                            snackbarHostState.showSnackbar("生成二维码失败: ${e.message}")
+                        }
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = isUnlocked
+            ) {
+                Text("显示恢复二维码")
+            }
+            
+            Text(
+                text = "使用另一台设备扫描此二维码可以快速恢复账户。请妥善保管，不要泄露给他人。",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             
             HorizontalDivider()
             

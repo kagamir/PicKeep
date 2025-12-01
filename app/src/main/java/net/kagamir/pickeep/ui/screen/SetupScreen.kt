@@ -1,5 +1,9 @@
 package net.kagamir.pickeep.ui.screen
 
+import android.Manifest
+import android.content.pm.PackageManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -7,14 +11,20 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Camera
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import com.journeyapps.barcodescanner.ScanContract
+import com.journeyapps.barcodescanner.ScanOptions
 import net.kagamir.pickeep.crypto.KeyDerivation
 import net.kagamir.pickeep.data.repository.SettingsRepository
+import net.kagamir.pickeep.util.QrCodeHelper
 
 /**
  * 初始设置界面
@@ -89,12 +99,26 @@ fun SetupScreen(
                     ) {
                         Text("使用助记词恢复")
                     }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    OutlinedButton(
+                        onClick = { setupMode = SetupMode.RESTORE_QR },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                    ) {
+                        Icon(Icons.Default.Camera, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("扫描二维码恢复")
+                    }
                 }
             } else {
                 // 具体流程
                 when (setupMode) {
                     SetupMode.NEW -> NewAccountFlow(settingsRepository, onSetupComplete)
                     SetupMode.RESTORE -> RestoreAccountFlow(settingsRepository, onSetupComplete)
+                    SetupMode.RESTORE_QR -> RestoreAccountQrFlow(settingsRepository, onSetupComplete)
                     null -> {} // Unreachable
                 }
             }
@@ -103,7 +127,7 @@ fun SetupScreen(
 }
 
 enum class SetupMode {
-    NEW, RESTORE
+    NEW, RESTORE, RESTORE_QR
 }
 
 @Composable
@@ -378,6 +402,239 @@ fun RestoreAccountFlow(
 
 enum class RestoreAccountStep {
     ENTER_MNEMONIC, SET_PASSWORD
+}
+
+@Composable
+fun RestoreAccountQrFlow(
+    settingsRepository: SettingsRepository,
+    onSetupComplete: () -> Unit
+) {
+    val context = LocalContext.current
+    var step by remember { mutableStateOf(RestoreAccountStep.ENTER_MNEMONIC) }
+    var mnemonicInput by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var confirmPassword by remember { mutableStateOf("") }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    
+    // 检查相机权限
+    var hasCameraPermission by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                Manifest.permission.CAMERA
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+    
+    // 二维码扫描启动器
+    val qrCodeLauncher = rememberLauncherForActivityResult(
+        contract = ScanContract()
+    ) { result ->
+        if (result.contents != null) {
+            val mnemonic = QrCodeHelper.parseRecoveryQrData(result.contents)
+            if (mnemonic != null) {
+                mnemonicInput = mnemonic.joinToString(" ")
+                errorMessage = null
+            } else {
+                errorMessage = "二维码格式无效，请确保扫描的是正确的恢复二维码"
+            }
+        } else {
+            // 扫描取消，不显示错误
+        }
+    }
+    
+    // 启动扫描的函数
+    fun startScan() {
+        val options = ScanOptions()
+        options.setDesiredBarcodeFormats(ScanOptions.QR_CODE)
+        options.setPrompt("将二维码对准扫描框")
+        // 使用自定义竖屏扫码 Activity
+        options.setCaptureActivity(net.kagamir.pickeep.ui.qr.QrCaptureActivity::class.java)
+        options.setCameraId(0)
+        options.setBeepEnabled(false)
+        options.setBarcodeImageEnabled(false)
+        qrCodeLauncher.launch(options)
+    }
+    
+    // 相机权限请求启动器
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        hasCameraPermission = isGranted
+        if (isGranted) {
+            // 权限已授予，启动扫描
+            startScan()
+        } else {
+            errorMessage = "需要相机权限才能扫描二维码"
+        }
+    }
+    
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+            .verticalScroll(rememberScrollState()),
+        verticalArrangement = Arrangement.Center,
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (step == RestoreAccountStep.ENTER_MNEMONIC) {
+            Text(
+                text = "扫描恢复二维码",
+                style = MaterialTheme.typography.titleLarge
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "使用另一台设备上显示的恢复二维码进行扫描",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            Button(
+                onClick = {
+                    if (!hasCameraPermission) {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    } else {
+                        startScan()
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Camera, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("扫描二维码")
+            }
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            HorizontalDivider()
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            Text(
+                text = "或手动输入助记词",
+                style = MaterialTheme.typography.titleMedium
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = mnemonicInput,
+                onValueChange = { mnemonicInput = it; errorMessage = null },
+                label = { Text("输入助记词 (空格分隔)") },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                maxLines = 5
+            )
+            
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Button(
+                onClick = {
+                    val words = mnemonicInput.trim().split("\\s+".toRegex())
+                    if (words.size !in listOf(12, 15, 18, 21, 24)) {
+                        errorMessage = "助记词长度无效 (当前: ${words.size}, 应为 12/15/18/21/24)"
+                        return@Button
+                    }
+                    if (words.isEmpty()) {
+                        errorMessage = "请输入助记词或扫描二维码"
+                        return@Button
+                    }
+                    // 简单验证（实际应用应校验 Checksum）
+                    step = RestoreAccountStep.SET_PASSWORD
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = mnemonicInput.isNotBlank()
+            ) {
+                Text("下一步")
+            }
+            
+        } else {
+            // 设置新密码
+            Text(
+                text = "设置新密码",
+                style = MaterialTheme.typography.titleLarge
+            )
+            
+            Spacer(modifier = Modifier.height(24.dp))
+            
+            OutlinedTextField(
+                value = password,
+                onValueChange = { password = it; errorMessage = null },
+                label = { Text("新密码") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            OutlinedTextField(
+                value = confirmPassword,
+                onValueChange = { confirmPassword = it; errorMessage = null },
+                label = { Text("确认密码") },
+                visualTransformation = PasswordVisualTransformation(),
+                modifier = Modifier.fillMaxWidth()
+            )
+            
+            if (errorMessage != null) {
+                Text(
+                    text = errorMessage!!,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+            }
+            
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Button(
+                onClick = {
+                    if (password != confirmPassword) {
+                        errorMessage = "两次密码输入不一致"
+                        return@Button
+                    }
+                    if (password.isEmpty()) {
+                        errorMessage = "密码不能为空"
+                        return@Button
+                    }
+                    
+                    isLoading = true
+                    try {
+                        val words = mnemonicInput.trim().split("\\s+".toRegex())
+                        settingsRepository.initialize(password, words)
+                        onSetupComplete()
+                    } catch (e: Exception) {
+                        errorMessage = e.message ?: "恢复失败，请检查助记词是否正确"
+                    } finally {
+                        isLoading = false
+                    }
+                },
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !isLoading
+            ) {
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                } else {
+                    Text("恢复账户")
+                }
+            }
+        }
+    }
 }
 
 @Composable

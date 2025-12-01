@@ -94,6 +94,10 @@ dependencies {
     implementation(libs.bouncycastle.bcprov)
     implementation(libs.bouncycastle.bcpkix)
     
+    // ZXing for QR Code
+    implementation(libs.zxing.core)
+    implementation(libs.zxing.android.embedded)
+    
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

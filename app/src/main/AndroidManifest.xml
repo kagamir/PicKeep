@@ -21,6 +21,9 @@
     
     <!-- 通知权限（Android 13+）-->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    
+    <!-- 相机权限（用于扫描二维码）-->
+    <uses-permission android:name="android.permission.CAMERA" />
 
     <application
         android:name=".PicKeepApplication"
@@ -43,6 +46,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- 自定义二维码扫码 Activity，强制竖屏 -->
+        <activity
+            android:name=".ui.qr.QrCaptureActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.PicKeep" />
         
         <!-- WorkManager 初始化 -->
         <provider
