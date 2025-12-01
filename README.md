@@ -221,8 +221,9 @@ app/src/main/java/net/kagamir/pickeep/
 
 ### 技术债务（未来改进）
 - [ ] 支持更多云存储协议（S3、自定义 API）
-- [ ] 添加端到端加密的照片查看器
+- [x] 添加端到端加密的照片查看器
 - [ ] 实现 Argon2id 密钥派生（性能优化，替代 PBKDF2）
+- [ ] I18N
 
 ## 许可证
 GNU GENERAL PUBLIC LICENSE VERSION 3
