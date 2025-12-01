@@ -27,17 +27,17 @@ android {
 
     signingConfigs {
         // 仅在 CI 中依赖外部 keystore（app/release.jks），本地如果没有环境变量可以继续用 debug 构建
-        create("release") {
-            // keystore 文件路径相对于 app/ 模块根目录
-            storeFile = file("release.jks")
-            if (
-                keystorePassword != null &&
-                keyAlias != null &&
-                keyPassword != null
-            ) {
+        if (
+            keystorePassword != null &&
+            keyAlias != null &&
+            keyPassword != null
+        ) {
+            create("release") {
+                // keystore 文件路径相对于 app/ 模块根目录
+                storeFile = file("release.jks")
                 storePassword = keystorePassword
                 this.keyAlias = keyAlias
-                keyPassword = keyPassword
+                this.keyPassword = keyPassword
             }
         }
     }
@@ -50,7 +50,10 @@ android {
                 "proguard-rules.pro"
             )
             // 关联上面的 release 签名配置，在 CI 中生成已签名的 release APK
-            signingConfig = signingConfigs.getByName("release")
+            // 只在环境变量存在时才使用 release 签名配置,否则使用 debug 签名
+            if (keystorePassword != null && keyAlias != null && keyPassword != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
