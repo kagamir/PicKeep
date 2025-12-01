@@ -60,5 +60,40 @@ object PermissionHelper {
         
         launcher.launch(getRequiredPermissions())
     }
+    
+    /**
+     * 检查是否有写入权限
+     * 注意：Android 10+ (API 29+) 使用 MediaStore API，不需要 WRITE_EXTERNAL_STORAGE
+     * 只需要读取权限即可通过 MediaStore API 写入文件
+     */
+    fun hasWritePermission(context: Context): Boolean {
+        // Android 10+ 使用 MediaStore API，只需要读取权限
+        return hasAllPermissions(context)
+    }
+    
+    /**
+     * 获取写入权限列表
+     */
+    fun getWritePermissions(): Array<String> {
+        // Android 10+ 使用 MediaStore，返回读取权限
+        return getRequiredPermissions()
+    }
+    
+    /**
+     * 请求写入权限
+     */
+    fun requestWritePermission(
+        activity: ComponentActivity,
+        onResult: (Boolean) -> Unit
+    ) {
+        val launcher = activity.registerForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            val allGranted = permissions.values.all { it }
+            onResult(allGranted)
+        }
+        
+        launcher.launch(getWritePermissions())
+    }
 }
 

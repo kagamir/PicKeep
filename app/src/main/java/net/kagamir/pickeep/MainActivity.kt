@@ -48,20 +48,31 @@ class MainActivity : ComponentActivity() {
     
     @Composable
     private fun MainContent() {
-        var hasPermissions by remember { mutableStateOf(PermissionHelper.hasAllPermissions(this)) }
+        var hasReadPermissions by remember { mutableStateOf(PermissionHelper.hasAllPermissions(this)) }
+        var hasWritePermissions by remember { mutableStateOf(PermissionHelper.hasWritePermission(this)) }
+        val hasPermissions = hasReadPermissions && hasWritePermissions
         val isUnlocked by settingsRepository.isUnlockedFlow.collectAsState()
         
-        // 权限请求启动器
-        val permissionLauncher = rememberLauncherForActivityResult(
+        // 权限请求启动器（读取权限）
+        val readPermissionLauncher = rememberLauncherForActivityResult(
             ActivityResultContracts.RequestMultiplePermissions()
         ) { permissions ->
-            hasPermissions = permissions.values.all { it }
+            hasReadPermissions = permissions.values.all { it }
+        }
+        
+        // 权限请求启动器（写入权限）
+        val writePermissionLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.RequestMultiplePermissions()
+        ) { permissions ->
+            hasWritePermissions = permissions.values.all { it }
         }
         
         // 检查并请求权限
         LaunchedEffect(Unit) {
-            if (!hasPermissions) {
-                permissionLauncher.launch(PermissionHelper.getRequiredPermissions())
+            if (!hasReadPermissions) {
+                readPermissionLauncher.launch(PermissionHelper.getRequiredPermissions())
+            } else if (!hasWritePermissions) {
+                writePermissionLauncher.launch(PermissionHelper.getWritePermissions())
             }
         }
         
@@ -109,9 +120,14 @@ class MainActivity : ComponentActivity() {
         } else {
             // 权限未授予，显示权限请求界面
             PermissionRequestScreen(
-                onRequestPermissions = {
-                    permissionLauncher.launch(PermissionHelper.getRequiredPermissions())
+                onRequestReadPermissions = {
+                    readPermissionLauncher.launch(PermissionHelper.getRequiredPermissions())
                 },
+                onRequestWritePermissions = {
+                    writePermissionLauncher.launch(PermissionHelper.getWritePermissions())
+                },
+                hasReadPermissions = hasReadPermissions,
+                hasWritePermissions = hasWritePermissions,
                 onOpenSettings = {
                     val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = Uri.fromParts("package", packageName, null)
@@ -124,7 +140,10 @@ class MainActivity : ComponentActivity() {
     
     @Composable
     private fun PermissionRequestScreen(
-        onRequestPermissions: () -> Unit,
+        onRequestReadPermissions: () -> Unit,
+        onRequestWritePermissions: () -> Unit,
+        hasReadPermissions: Boolean,
+        hasWritePermissions: Boolean,
         onOpenSettings: () -> Unit
     ) {
         Surface(
@@ -160,11 +179,24 @@ class MainActivity : ComponentActivity() {
                 
                 Spacer(modifier = Modifier.height(32.dp))
                 
+                if (!hasReadPermissions) {
+                    Button(
+                        onClick = onRequestReadPermissions,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("授予读取权限")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+                
+                if (!hasWritePermissions) {
                 Button(
-                    onClick = onRequestPermissions,
+                        onClick = onRequestWritePermissions,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("授予权限")
+                        Text("授予写入权限")
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
                 
                 Spacer(modifier = Modifier.height(8.dp))

@@ -36,6 +36,42 @@ class PhotoRepository(private val database: PicKeepDatabase) {
         photoDao.getByLocalPath(path)
     
     /**
+     * 根据远程路径获取照片
+     */
+    suspend fun getPhotoByRemotePath(remotePath: String): PhotoEntity? =
+        photoDao.getByRemotePath(remotePath)
+    
+    /**
+     * 获取所有已同步的照片
+     */
+    fun getSyncedPhotos(): Flow<List<PhotoEntity>> =
+        photoDao.getPhotosByStatus(SyncStatus.SYNCED)
+    
+    /**
+     * 获取所有已同步的照片（同步版本）
+     */
+    suspend fun getSyncedPhotosSync(): List<PhotoEntity> =
+        photoDao.getPhotosByStatusSync(SyncStatus.SYNCED)
+    
+    /**
+     * 分页获取已同步的照片
+     * 
+     * @param pageSize 每页大小
+     * @param offset 偏移量
+     * @return 照片列表
+     */
+    suspend fun getSyncedPhotosPaged(pageSize: Int, offset: Int): List<PhotoEntity> {
+        return photoDao.getSyncedPhotosPaged(SyncStatus.SYNCED, pageSize, offset)
+    }
+    
+    /**
+     * 获取已同步照片总数
+     */
+    suspend fun getSyncedPhotosCount(): Int {
+        return photoDao.getSyncedPhotosCount(SyncStatus.SYNCED)
+    }
+    
+    /**
      * 插入照片
      */
     suspend fun insertPhoto(photo: PhotoEntity): Long = photoDao.insert(photo)

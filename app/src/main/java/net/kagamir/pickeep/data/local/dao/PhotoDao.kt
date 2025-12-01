@@ -81,6 +81,12 @@ interface PhotoDao {
     @Query("SELECT * FROM photos WHERE sync_status = :status ORDER BY created_at ASC LIMIT :limit")
     suspend fun getPendingPhotos(status: SyncStatus, limit: Int): List<PhotoEntity>
     
+    @Query("SELECT * FROM photos WHERE sync_status = :status ORDER BY last_synced_at DESC LIMIT :limit OFFSET :offset")
+    suspend fun getSyncedPhotosPaged(status: SyncStatus, limit: Int, offset: Int): List<PhotoEntity>
+    
+    @Query("SELECT COUNT(*) FROM photos WHERE sync_status = :status")
+    suspend fun getSyncedPhotosCount(status: SyncStatus): Int
+    
     @Query("SELECT COUNT(*) FROM photos")
     suspend fun getTotalCount(): Int
 

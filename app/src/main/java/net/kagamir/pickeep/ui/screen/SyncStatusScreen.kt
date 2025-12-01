@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Sync
@@ -32,7 +33,8 @@ fun SyncStatusScreen(
     database: PicKeepDatabase,
     settingsRepository: SettingsRepository,
     workManagerScheduler: WorkManagerScheduler,
-    onNavigateToSettings: () -> Unit
+    onNavigateToSettings: () -> Unit,
+    onNavigateToBrowse: () -> Unit
 ) {
     var pendingCount by remember { mutableStateOf(0) }
     var uploadingCount by remember { mutableStateOf(0) }
@@ -191,6 +193,19 @@ fun SyncStatusScreen(
                     StatusRow("已同步", syncedCount)
                     if (failedCount > 0) {
                         StatusRow("失败", failedCount, isError = true)
+                    }
+                    
+                    // 浏览已上传文件按钮
+                    if (syncedCount > 0) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Button(
+                            onClick = onNavigateToBrowse,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Folder, "浏览", modifier = Modifier.size(18.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("浏览已上传文件 ($syncedCount)")
+                        }
                     }
                 }
             }
